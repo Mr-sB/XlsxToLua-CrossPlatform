@@ -8,6 +8,7 @@
     <RootNamespace>ExcelDataReader.DataSet_mono</RootNamespace>
     <AssemblyName>ExcelDataReader.DataSet_mono</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <UseMSBuildEngine>False</UseMSBuildEngine>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
