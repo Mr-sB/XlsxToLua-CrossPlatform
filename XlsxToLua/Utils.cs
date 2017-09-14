@@ -621,6 +621,13 @@ public class Utils
 
         return Path.Combine(path1, path2);
     }
+
+    public static List<string> GetSupportedExcelFilePaths(string excelFolder)
+    {
+		List<string> existExcelFilePaths = new List<string>(Directory.GetFiles(excelFolder, "*.xlsx"));
+        existExcelFilePaths.AddRange(Directory.GetFiles(excelFolder, "*.xlsm"));
+        return existExcelFilePaths;
+	}
 }
 
 public enum FileState

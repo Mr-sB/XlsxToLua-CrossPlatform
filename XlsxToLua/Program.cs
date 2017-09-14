@@ -50,7 +50,8 @@ public class Program
         Utils.Log(string.Format("选择的Excel所在路径：{0}", AppValues.ExcelFolderPath));
 
         // 记录目录中存在的所有Excel文件名（注意不能直接用File.Exists判断某个字符串代表的文件名是否存在，因为Windows会忽略声明的Excel文件名与实际文件名的大小写差异）
-        List<string> existExcelFilePaths = new List<string>(Directory.GetFiles(AppValues.ExcelFolderPath, "*.xlsx"));
+        //List<string> existExcelFilePaths = new List<string>(Directory.GetFiles(AppValues.ExcelFolderPath, "*.xlsx"));
+        List<string> existExcelFilePaths = Utils.GetSupportedExcelFilePaths(AppValues.ExcelFolderPath);
         List<string> existExcelFileNames = new List<string>();
         foreach (string filePath in existExcelFilePaths)
             existExcelFileNames.Add(Path.GetFileNameWithoutExtension(filePath));
@@ -769,7 +770,7 @@ public class Program
         // 如果未指定导出部分Excel文件，则全部导出，但要排除设置了进行忽略的
         if (AppValues.ExportTableNames.Count == 0)
         {
-            foreach (string filePath in Directory.GetFiles(AppValues.ExcelFolderPath, "*.xlsx"))
+            foreach (string filePath in Utils.GetSupportedExcelFilePaths(AppValues.ExcelFolderPath))
             {
                 string fileName = Path.GetFileNameWithoutExtension(filePath);
                 if (fileName.StartsWith(AppValues.EXCEL_TEMP_FILE_FILE_NAME_START_STRING))
@@ -874,7 +875,7 @@ public class Program
         // 读取给定的Excel所在目录下的所有Excel文件，然后解析成本工具所需的数据结构
         Utils.Log("开始解析Excel所在目录下的所有Excel文件：");
         Stopwatch stopwatch = new Stopwatch();
-        foreach (string filePath in Directory.GetFiles(AppValues.ExcelFolderPath, "*.xlsx"))
+		foreach (string filePath in Utils.GetSupportedExcelFilePaths(AppValues.ExcelFolderPath))
         {
             string fileName = Path.GetFileNameWithoutExtension(filePath);
             if (fileName.StartsWith(AppValues.EXCEL_TEMP_FILE_FILE_NAME_START_STRING))

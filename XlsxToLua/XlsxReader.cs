@@ -116,7 +116,7 @@ public class XlsxReader
 				{
 					reader = ExcelReaderFactory.CreateBinaryReader(stream);
 				}
-				else if (file.Extension == ".xlsx")
+				else if (file.Extension == ".xlsx" || file.Extension == ".xlsm")
 				{
 					reader = ExcelReaderFactory.CreateOpenXmlReader(stream);
 				}
