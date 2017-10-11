@@ -1331,7 +1331,7 @@ public class TableAnalyzeHelper
                     }
                     catch (JsonException exception)
                     {
-                        errorStringBuilder.AppendFormat("第{0}行所填json字符串（{1}）非法，原因为：{2}\n", row + AppValues.DATA_FIELD_DATA_START_INDEX + 1, inputData, exception.Message);
+                        errorStringBuilder.AppendFormat("第{0}行所填json字符串（{1}）非法，原因为：{2}\n", row + 1, inputData, exception.Message);
                     }
                 }
             }
@@ -1878,7 +1878,7 @@ public class TableAnalyzeHelper
                 validInfo.Add(true);
             else
             {
-                Utils.LogWarning(string.Format("警告：表格{0}的第{1}列的第{2}行数据有误，array或dict类型中若某行不需要此数据请填-1，否则留空，你填写的为\"{3}\"，本工具按有效值进行处理，但请按规范更正", tableName, Utils.GetExcelColumnName(columnIndex + 1), row, inputData));
+                Utils.LogWarning(string.Format("警告：表格{0}的第{1}列的第{2}行数据有误，array或dict类型中若某行不需要此数据请填-1，否则留空，你填写的为\"{3}\"，本工具按有效值进行处理，但请按规范更正", tableName, Utils.GetExcelColumnName(columnIndex + 1), row + 1, inputData));
                 validInfo.Add(true);
             }
         }
