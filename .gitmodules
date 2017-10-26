@@ -1,0 +1,3 @@
+[submodule "XlsxToLua/ExcelDataReader"]
+	path = XlsxToLua/ExcelDataReader
+	url = https://github.com/mimicryryu/ExcelDataReader-mono-compatible
