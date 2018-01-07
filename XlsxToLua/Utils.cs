@@ -537,13 +537,38 @@ public class Utils
     }
 
     /// <summary>
+    /// 获取导出某种生成文件的存储目录
+    /// </summary>
+    public static string GetExportDirectoryPath(string tableName, string exportRootPath)
+    {
+        if (AppValues.IsExportKeepDirectoryStructure == true)
+        {
+            // 获取表格相对于Excel文件夹的相对路径
+            string excelFolderPath = AppValues.ExcelFolderPath.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar);
+            if (!excelFolderPath.EndsWith(Path.DirectorySeparatorChar.ToString()))
+                excelFolderPath = excelFolderPath + Path.DirectorySeparatorChar;
+
+            Uri excelFolderUri = new Uri(excelFolderPath);
+            Uri fileUri = new Uri(AppValues.ExportTableNameAndPath[tableName]);
+            Uri relativeUri = excelFolderUri.MakeRelativeUri(fileUri);
+            return Path.GetDirectoryName(CombinePath(exportRootPath, relativeUri.ToString()));
+        }
+        else
+            return exportRootPath;
+    }
+
+    /// <summary>
     /// 将某张Excel表格转换为lua table内容保存到文件
     /// </summary>
-    public static bool SaveLuaFile(string tableName, string content)
+    public static bool SaveLuaFile(string tableName, string fileName, string content)
     {
         try
         {
-            string savePath = Utils.CombinePath(AppValues.ExportLuaFilePath, tableName + ".lua");
+            string exportDirectoryPath = GetExportDirectoryPath(tableName, AppValues.ExportLuaFilePath);
+            if (Directory.Exists(exportDirectoryPath) == false)
+                Directory.CreateDirectory(exportDirectoryPath);
+
+            string savePath = Utils.CombinePath(exportDirectoryPath, fileName + ".lua");
             StreamWriter writer = new StreamWriter(savePath, false, new UTF8Encoding(false));
             writer.Write(content);
             writer.Flush();
@@ -560,8 +585,12 @@ public class Utils
     {
         try
         {
+            string exportDirectoryPath = GetExportDirectoryPath(tableName, AppValues.ExportCsvPath);
+            if (Directory.Exists(exportDirectoryPath) == false)
+                Directory.CreateDirectory(exportDirectoryPath);
+
             string fileName = string.Concat(tableName, ".", AppValues.ExportCsvExtension);
-            string savePath = Utils.CombinePath(AppValues.ExportCsvPath, fileName);
+            string savePath = Utils.CombinePath(exportDirectoryPath, fileName);
             StreamWriter writer = new StreamWriter(savePath, false, new UTF8Encoding(false));
             foreach (StringBuilder stringBuilder in rowContentList)
                 writer.WriteLine(stringBuilder);
@@ -576,12 +605,16 @@ public class Utils
         }
     }
 
-    public static bool SaveCsClassFile(string className, string content)
+    public static bool SaveCsClassFile(string tableName, string className, string content)
     {
         try
         {
+            string exportDirectoryPath = GetExportDirectoryPath(tableName, AppValues.ExportCsClassPath);
+            if (Directory.Exists(exportDirectoryPath) == false)
+                Directory.CreateDirectory(exportDirectoryPath);
+
             string fileName = string.Concat(className, ".", AppValues.EXPORT_CS_CLASS_FILE_EXTENSION);
-            string savePath = Utils.CombinePath(AppValues.ExportCsClassPath, fileName);
+            string savePath = Utils.CombinePath(exportDirectoryPath, fileName);
             StreamWriter writer = new StreamWriter(savePath, false, new UTF8Encoding(false));
             writer.Write(content);
             writer.Flush();
@@ -594,12 +627,16 @@ public class Utils
         }
     }
 
-    public static bool SaveJavaClassFile(string className, string content)
+    public static bool SaveJavaClassFile(string tableName, string className, string content)
     {
         try
         {
+            string exportDirectoryPath = GetExportDirectoryPath(tableName, AppValues.ExportJavaClassPath);
+            if (Directory.Exists(exportDirectoryPath) == false)
+                Directory.CreateDirectory(exportDirectoryPath);
+
             string fileName = string.Concat(className, ".", AppValues.EXPORT_JAVA_CLASS_FILE_EXTENSION);
-            string savePath = Utils.CombinePath(AppValues.ExportJavaClassPath, fileName);
+            string savePath = Utils.CombinePath(exportDirectoryPath, fileName);
             StreamWriter writer = new StreamWriter(savePath, false, new UTF8Encoding(false));
             writer.Write(content);
             writer.Flush();
@@ -616,8 +653,12 @@ public class Utils
     {
         try
         {
+            string exportDirectoryPath = GetExportDirectoryPath(tableName, AppValues.ExportJsonPath);
+            if (Directory.Exists(exportDirectoryPath) == false)
+                Directory.CreateDirectory(exportDirectoryPath);
+
             string fileName = string.Concat(tableName, ".", AppValues.ExportJsonExtension);
-            string savePath = Utils.CombinePath(AppValues.ExportJsonPath, fileName);
+            string savePath = Utils.CombinePath(exportDirectoryPath, fileName);
             StreamWriter writer = new StreamWriter(savePath, false, new UTF8Encoding(false));
             writer.Write(content);
             writer.Flush();
@@ -636,6 +677,9 @@ public class Utils
     public static string CombinePath(string path1, string path2)
     {
         path1 = path1.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar);
+        if (!path1.EndsWith(Path.DirectorySeparatorChar.ToString()))
+            path1 = path1 + Path.DirectorySeparatorChar;
+
         path2 = path2.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar);
         if (path2.StartsWith(Path.DirectorySeparatorChar.ToString()))
             path2 = path2.Substring(1, path2.Length - 1);
@@ -643,10 +687,10 @@ public class Utils
         return Path.Combine(path1, path2);
     }
 
-    public static List<string> GetSupportedExcelFilePaths(string excelFolder)
+    public static List<string> GetSupportedExcelFilePaths(string excelFolder, SearchOption searchOption)
     {
-		List<string> existExcelFilePaths = new List<string>(Directory.GetFiles(excelFolder, "*.xlsx"));
-        existExcelFilePaths.AddRange(Directory.GetFiles(excelFolder, "*.xlsm"));
+		List<string> existExcelFilePaths = new List<string>(Directory.GetFiles(excelFolder, "*.xlsx", searchOption));
+        existExcelFilePaths.AddRange(Directory.GetFiles(excelFolder, "*.xlsm", searchOption));
         return existExcelFilePaths;
 	}
 }
