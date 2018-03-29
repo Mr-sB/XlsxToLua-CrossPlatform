@@ -277,6 +277,9 @@ public class AppValues
     // 声明对某张表格不进行默认导出的参数配置
     public const string CONFIG_PARAM_NOT_EXPORT_ORIGINAL_TABLE = "-notExportOriginalTable";
 
+    // Support table with only one column
+    public const string CONFIG_COMPACTED_ONE_COLUMN_TABLE = "compactedOneColumnTable";
+
     // 以下为config配置文件中配置项的key名
     // MySQL连接字符串
     public const string APP_CONFIG_KEY_MYSQL_CONNECT_STRING = "connectMySQLString";

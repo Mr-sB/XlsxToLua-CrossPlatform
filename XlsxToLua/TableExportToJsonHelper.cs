@@ -12,6 +12,11 @@ public class TableExportToJsonHelper
     {
         StringBuilder content = new StringBuilder();
 
+        // Check compacted one colume
+        bool compactedOneColumnTable = tableInfo.TableConfig != null && tableInfo.TableConfig.ContainsKey(AppValues.CONFIG_COMPACTED_ONE_COLUMN_TABLE) && tableInfo.TableConfig[AppValues.CONFIG_COMPACTED_ONE_COLUMN_TABLE].Count > 0 && "true".Equals(tableInfo.TableConfig[AppValues.CONFIG_COMPACTED_ONE_COLUMN_TABLE][0], StringComparison.CurrentCultureIgnoreCase);
+
+        string notUsed;
+
         // 若生成为各行数据对应的json object包含在一个json array的形式
         if (AppValues.ExportJsonIsExportJsonArrayFormat == true)
         {
@@ -29,7 +34,7 @@ public class TableExportToJsonHelper
 
                 for (int column = 0; column < fieldCount; ++column)
                 {
-                    string oneFieldString = _GetOneField(allField[column], row, out errorString);
+                    string oneFieldString = _GetOneField(allField[column], row, out errorString, out notUsed);
                     if (errorString != null)
                     {
                         errorString = string.Format("额外导出表格{0}为json文件失败，", tableInfo.TableName) + errorString;
@@ -84,13 +89,40 @@ public class TableExportToJsonHelper
                     return false;
                 }
 
+                // Check if compact one column is set
+                if (compactedOneColumnTable == true) {
+                    if (allField.Count > 1)
+                    {
+                        if (allField.Count > 2)
+                        {
+                            Utils.LogWarning(string.Format("警告：compactedOneColumnTable is set and only the first value column will be exported! " +
+                                                           "{0} column(s) will be ignored.", allField.Count - 2));
+                        }
+                        string value;
+                        _GetOneField(allField[1], row, out errorString, out value);
+                        if (errorString != null)
+                        {
+                            errorString = string.Format("导出表格{0}失败，", tableInfo.TableName) + errorString;
+                            return false;
+                        }
+                        content.Append(":");
+                        content.Append(value);
+                    }
+                    else
+                    {
+                        content.Append(":null");
+                    }
+                    content.Append(",");
+                    continue;
+                }
+
                 // 生成一行数据json object的开头
                 content.Append(":{");
 
                 int startColumn = (AppValues.ExportJsonIsExportJsonMapIncludeKeyColumnValue == true ? 0 : 1);
                 for (int column = startColumn; column < fieldCount; ++column)
                 {
-                    string oneFieldString = _GetOneField(allField[column], row, out errorString);
+                    string oneFieldString = _GetOneField(allField[column], row, out errorString, out notUsed);
                     if (errorString != null)
                     {
                         errorString = string.Format("额外导出表格{0}为json文件失败，", tableInfo.TableName) + errorString;
@@ -134,7 +166,7 @@ public class TableExportToJsonHelper
         }
     }
 
-    private static string _GetOneField(FieldInfo fieldInfo, int row, out string errorString)
+    private static string _GetOneField(FieldInfo fieldInfo, int row, out string errorString, out string value)
     {
         StringBuilder content = new StringBuilder();
         errorString = null;
@@ -147,7 +179,8 @@ public class TableExportToJsonHelper
         }
 
         // 对应数据值
-        string value = null;
+        //string value = null;
+        value = null;
         switch (fieldInfo.DataType)
         {
             case DataType.Int:
@@ -686,10 +719,12 @@ public class TableExportToJsonHelper
             // dict生成json object
             content.Append("{");
 
+            string notUsed;
+
             // 逐个对子元素进行生成
             foreach (FieldInfo childField in fieldInfo.ChildField)
             {
-                string oneFieldString = _GetOneField(childField, row, out errorString);
+                string oneFieldString = _GetOneField(childField, row, out errorString, out notUsed);
                 if (errorString != null)
                     return null;
                 else
@@ -718,11 +753,13 @@ public class TableExportToJsonHelper
             // array生成json array
             content.Append("[");
 
+            string notUsed;
+
             // 逐个对子元素进行生成
             bool hasValidChild = false;
             foreach (FieldInfo childField in fieldInfo.ChildField)
             {
-                string oneFieldString = _GetOneField(childField, row, out errorString);
+                string oneFieldString = _GetOneField(childField, row, out errorString, out notUsed);
                 if (errorString != null)
                     return null;
 

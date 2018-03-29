@@ -33,6 +33,14 @@ public class TableExportToLuaHelper
         // 判断是否设置要将主键列的值作为导出的table中的元素
         bool isAddKeyToLuaTable = tableInfo.TableConfig != null && tableInfo.TableConfig.ContainsKey(AppValues.CONFIG_NAME_ADD_KEY_TO_LUA_TABLE) && tableInfo.TableConfig[AppValues.CONFIG_NAME_ADD_KEY_TO_LUA_TABLE].Count > 0 && "true".Equals(tableInfo.TableConfig[AppValues.CONFIG_NAME_ADD_KEY_TO_LUA_TABLE][0], StringComparison.CurrentCultureIgnoreCase);
 
+        // Check compacted one colume
+        bool compactedOneColumnTable = tableInfo.TableConfig != null && tableInfo.TableConfig.ContainsKey(AppValues.CONFIG_COMPACTED_ONE_COLUMN_TABLE) && tableInfo.TableConfig[AppValues.CONFIG_COMPACTED_ONE_COLUMN_TABLE].Count > 0 && "true".Equals(tableInfo.TableConfig[AppValues.CONFIG_COMPACTED_ONE_COLUMN_TABLE][0], StringComparison.CurrentCultureIgnoreCase);
+
+        if (compactedOneColumnTable) {
+            Utils.LogWarning("警告：isAddKeyToLuaTable is disabled if compactedOneColumnTable == true");
+            isAddKeyToLuaTable = false; // Always disabled
+        }
+
         // 逐行读取表格内容生成lua table
         List<FieldInfo> allField = tableInfo.GetAllClientFieldInfo();
         int dataCount = tableInfo.GetKeyColumnFieldInfo().Data.Count;
@@ -53,6 +61,32 @@ public class TableExportToLuaHelper
                 return false;
             }
 
+            // Check if compact one column is set
+            if (compactedOneColumnTable == true)
+            {
+                if (allField.Count > 1)
+                {
+                    if (allField.Count > 2)
+                    {
+                        Utils.LogWarning(string.Format("警告：compactedOneColumnTable is set and only the first value column will be exported! " +
+                                                       "{0} column(s) will be ignored.", allField.Count - 2));
+                    }
+                    string value;
+                    _GetOneField(allField[1], row, currentLevel, out errorString, out value);
+                    if (errorString != null)
+                    {
+                        errorString = string.Format("导出表格{0}失败，", tableInfo.TableName) + errorString;
+                        return false;
+                    }
+                    content.Append(" = ");
+                    content.Append(value);
+                } else {
+                    content.Append("= nil");
+                }
+                content.AppendLine(",");
+                continue;
+            }
+
             content.AppendLine(" = {");
             ++currentLevel;
 
@@ -71,9 +105,10 @@ public class TableExportToLuaHelper
             }
 
             // 将其他列依次作为value生成
+            string notUsed;
             for (int column = 1; column < allField.Count; ++column)
             {
-                string oneFieldString = _GetOneField(allField[column], row, currentLevel, out errorString);
+                string oneFieldString = _GetOneField(allField[column], row, currentLevel, out errorString, out notUsed);
                 if (errorString != null)
                 {
                     errorString = string.Format("导出表格{0}失败，", tableInfo.TableName) + errorString;
@@ -398,13 +433,14 @@ public class TableExportToLuaHelper
             content.AppendLine(" = {");
             ++currentLevel;
 
+            string notUsed;
             // 如果已是最内层，输出指定table value中的数据
             if (parentDict[key].GetType() == typeof(int))
             {
                 foreach (FieldInfo fieldInfo in tableValueField)
                 {
                     int rowIndex = (int)parentDict[key];
-                    string oneTableValueFieldData = _GetOneField(fieldInfo, rowIndex, currentLevel, out errorString);
+                    string oneTableValueFieldData = _GetOneField(fieldInfo, rowIndex, currentLevel, out errorString, out notUsed);
                     if (errorString != null)
                     {
                         errorString = string.Format("第{0}行的字段\"{1}\"（列号：{2}）导出数据错误：{3}", rowIndex + AppValues.DATA_FIELD_DATA_START_INDEX + 1, fieldInfo.FieldName, Utils.GetExcelColumnName(fieldInfo.ColumnSeq + 1), errorString);
@@ -474,7 +510,7 @@ public class TableExportToLuaHelper
         return indentationStringBuilder.ToString();
     }
 
-    private static string _GetOneField(FieldInfo fieldInfo, int row, int level, out string errorString)
+    private static string _GetOneField(FieldInfo fieldInfo, int row, int level, out string errorString, out string value)
     {
         StringBuilder content = new StringBuilder();
         errorString = null;
@@ -485,7 +521,8 @@ public class TableExportToLuaHelper
         content.Append(fieldInfo.FieldName);
         content.Append(" = ");
         // 对应数据值
-        string value = null;
+        //string value = null;
+        value = null;
         switch (fieldInfo.DataType)
         {
             case DataType.Int:
@@ -706,6 +743,7 @@ public class TableExportToLuaHelper
     private static string _GetSetValue(FieldInfo fieldInfo, int row, int level, out string errorString)
     {
         StringBuilder content = new StringBuilder();
+        string notUsed = null;
 
         // 如果该dict或array数据用-1标为无效，则赋值为nil
         if ((bool)fieldInfo.Data[row] == false)
@@ -718,7 +756,7 @@ public class TableExportToLuaHelper
             // 逐个对子元素进行生成
             foreach (FieldInfo childField in fieldInfo.ChildField)
             {
-                string oneFieldString = _GetOneField(childField, row, level, out errorString);
+                string oneFieldString = _GetOneField(childField, row, level, out errorString, out notUsed);
                 if (errorString != null)
                     return null;
                 else
