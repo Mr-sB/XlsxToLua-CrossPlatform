@@ -63,6 +63,7 @@
     <Compile Include="TxtConfigReader.cs" />
     <Compile Include="Utils.cs" />
     <Compile Include="XlsxReader.cs" />
+    <Compile Include="TableExportToJsonHelper_ext.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="ExcelDataReader\src\ExcelDataReader.DataSet\ExcelDataReader.DataSet_mono.csproj">

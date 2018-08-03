@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-public class TableExportToJsonHelper
+public partial class TableExportToJsonHelper
 {
     // 用于缩进json的字符串
     private static string _JSON_INDENTATION_STRING = "\t";
@@ -154,7 +154,7 @@ public class TableExportToJsonHelper
             exportString = _FormatJson(exportString);
 
         // 保存为json文件
-        if (Utils.SaveJsonFile(tableInfo.TableName, exportString) == true)
+        if (Utils.SaveJsonFile(tableInfo.TableName, null, exportString) == true)
         {
             errorString = null;
             return true;

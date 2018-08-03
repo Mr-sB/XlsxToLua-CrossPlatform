@@ -645,7 +645,7 @@ public class Utils
         }
     }
 
-    public static bool SaveJsonFile(string tableName, string content)
+    public static bool SaveJsonFile(string tableName, string alternativeFileName, string content)
     {
         try
         {
@@ -653,8 +653,15 @@ public class Utils
             if (Directory.Exists(exportDirectoryPath) == false)
                 Directory.CreateDirectory(exportDirectoryPath);
 
-            string fileName = string.Concat(tableName, ".", AppValues.ExportJsonExtension);
-            string savePath = Utils.CombinePath(exportDirectoryPath, fileName);
+            if (string.IsNullOrEmpty(alternativeFileName))
+            {
+                alternativeFileName = string.Concat(tableName, ".", AppValues.ExportJsonExtension);
+            }
+            else 
+            {
+                alternativeFileName = string.Concat(alternativeFileName, ".", AppValues.ExportJsonExtension);
+            }
+            string savePath = Utils.CombinePath(exportDirectoryPath, alternativeFileName);
             StreamWriter writer = new StreamWriter(savePath, false, new UTF8Encoding(false));
             writer.Write(content);
             writer.Flush();

@@ -5,6 +5,6 @@
   </PropertyGroup>
   <PropertyGroup Condition=" '$(RunConfiguration)' == 'Default' ">
     <StartAction>Project</StartAction>
-    <StartArguments>TestExcel2 "foo" "-noClient" "lang.txt" "-allowedNullNumber" "-columnInfo" -exportJson($all) -exportJsonParam(exportPath=bar|extension=json|isFormat=true|isExportJsonArrayFormat=false)</StartArguments>
+    <StartArguments>TestExcel ExportLua ClientVirtual lang.txt -columnInfo -printEmptyStringWhenLangNotMatching -allowedNullNumber -except(TestChecker|TestMapStringChecker) -exportCsv($all) -exportCsvParam(exportPath=ExportCsv|extension=csv|splitString=\||isExportColumnName=true|IsExportColumnDataType=true) -exportCsClass($all) -exportCsClassParam(exportPath=ExportCsClass|namespace=Assets.Scripts.CsClass|using=System,System.Collections.Generic) -autoNameCsvClassParam(classNamePrefix=TableData|classNamePostfix=Pojo) -exportJson($all) -exportJsonParam(exportPath=ExportJson|extension=txt|isFormat=true|isExportJsonArrayFormat=false|isMapIncludeKeyColumnValue=true) -exportJavaClass($all) -exportJavaClassParam(exportPath=ExportJavaClass|package=org.xlsxtolua.pojo|import=java.util.ArrayList,java.util.HashMap|isUseDate=true|isGenerateConstructorWithoutFields=true|isGenerateConstructorWithAllFields=true)</StartArguments>
   </PropertyGroup>
 </Project>
