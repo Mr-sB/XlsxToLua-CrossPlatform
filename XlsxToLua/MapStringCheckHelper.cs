@@ -613,13 +613,76 @@ public class MapStringCheckHelper
         }
         else
         {
-            if (jsonData.Keys.Contains(paramRequiredInfo.ParamName))
+            if (paramRequiredInfo.ArrayParamRequiredInfo != null) 
+            {
+                JsonData arrayJsonData = null;
+                if (jsonData.Keys.Contains(paramRequiredInfo.ParamName))
+                    arrayJsonData = jsonData[paramRequiredInfo.ParamName];
+                if (_CheckArrayParamData(arrayJsonData, paramRequiredInfo.ArrayParamRequiredInfo, out errorString) == false)
+                    errorStringList.Add(string.Format("参数{0}下属array未通过检查：{1}", paramRequiredInfo.ParamName, errorString));
+            }
+            else if (jsonData.Keys.Contains(paramRequiredInfo.ParamName))
             {
                 if (_CheckMapStringData(jsonData[paramRequiredInfo.ParamName], paramRequiredInfo.MapStringRequiredInfo, out errorString) == false)
                     errorStringList.Add(string.Format("参数{0}下属map未通过检查：{1}", paramRequiredInfo.ParamName, errorString));
             }
             else
                 errorStringList.Add(string.Format("规则要求对mapString型参数{0}下属的子元素进行检查，而输入数据中不含此参数", paramRequiredInfo.ParamName));
+        }
+
+        if (errorStringList.Count == 0)
+        {
+            errorString = null;
+            return true;
+        }
+        else
+        {
+            errorString = Utils.CombineString(errorStringList, "；");
+            return false;
+        }
+    }
+
+    private static bool _CheckArrayParamData(JsonData jsonData, MapStringParamRequiredInfo paramRequiredInfo, out string errorString)
+    {
+        List<string> errorStringList = new List<string>();
+        if (paramRequiredInfo.MapStringRequiredInfo == null && paramRequiredInfo.ArrayParamRequiredInfo == null)
+        {
+            if (paramRequiredInfo.ParamRequired == ParamRequired.MustHave)
+            {
+                if (jsonData == null ||  jsonData.Count == 0)
+                    errorStringList.Add(string.Format("array要求非空但是为空"));
+            }
+            else if (paramRequiredInfo.ParamRequired == ParamRequired.NotAllowed)
+            {
+                if (jsonData != null && jsonData.Count > 0)
+                    errorStringList.Add(string.Format("array要求为空但是非空"));
+            }
+        }
+        else if (jsonData == null)
+        {
+            errorStringList.Add(string.Format("array要求对子元素进行参数检查但是array为空"));
+        }
+        else if (paramRequiredInfo.MapStringRequiredInfo != null)
+        {
+            foreach(JsonData item in jsonData)
+            {
+                if (_CheckMapStringData(item, paramRequiredInfo.MapStringRequiredInfo, out errorString) == false)
+                {
+                    errorStringList.Add(string.Format("array子元素map未通过检查：{0}", errorString));
+                    break;
+                }           
+            }
+        }
+        else
+        {
+            foreach(JsonData item in jsonData)
+            {
+                if (_CheckArrayParamData(item, paramRequiredInfo.ArrayParamRequiredInfo, out errorString) == false)
+                {
+                    errorStringList.Add(string.Format("array子元素array未通过检查：{0}", errorString));
+                    break;
+                }           
+            }
         }
 
         if (errorStringList.Count == 0)
@@ -669,6 +732,7 @@ public class MapStringCheckHelper
     {
         // 检查括号是否匹配
         int leftBracketCount = 0;
+        int leftSquareBracketCount = 0;
         for (int i = 0; i < defineString.Length; ++i)
         {
             char c = defineString[i];
@@ -676,16 +740,30 @@ public class MapStringCheckHelper
                 ++leftBracketCount;
             else if (c == ')')
                 --leftBracketCount;
+            else if (c == '[')
+                ++leftSquareBracketCount;
+            else if (c == ']')
+                --leftSquareBracketCount;
 
             if (leftBracketCount < 0)
             {
                 errorString = "定义字符串中括号不匹配，存在\")\"没有前面与之对应的\"(\"";
                 return null;
             }
+            if (leftSquareBracketCount < 0)
+            {
+                errorString = "定义字符串中[]不匹配，存在\"]\"没有前面与之对应的\"[\"";
+                return null;
+            }
         }
         if (leftBracketCount > 0)
         {
             errorString = string.Format("定义字符串中括号不匹配，有{0}个\"(\"没有与之对应的\")\"", leftBracketCount);
+            return null;
+        }
+        if (leftSquareBracketCount > 0)
+        {
+            errorString = string.Format("定义字符串中[]不匹配，有{0}个\"[\"没有与之对应的\"]\"", leftSquareBracketCount);
             return null;
         }
 
@@ -714,6 +792,16 @@ public class MapStringCheckHelper
             else if (c == ')')
             {
                 tokenList.Add(new MapStringToken(MapStringTokenType.EndMap, ")"));
+                ++nextCharIndex;
+            }
+            else if (c == '[')
+            {
+                tokenList.Add(new MapStringToken(MapStringTokenType.StartArray, "["));
+                ++nextCharIndex;
+            }
+            else if (c == ']')
+            {
+                tokenList.Add(new MapStringToken(MapStringTokenType.EndArray, "]"));
                 ++nextCharIndex;
             }
             else if (char.IsLetter(c) || c == '_')
@@ -903,6 +991,29 @@ public class MapStringCheckRuleParser
                 return;
             }
         }
+        else if (valueToken.TokenType == MapStringTokenType.StartArray)
+        {
+            if (paramInfo.DataType == DataType.Array)
+            {
+                MapStringParamRequiredInfo childRequiredInfo = _GetArrayElement(formatDefine.ParamInfo[key].ArrayParamInfo, out errorString);
+                if (errorString != null)
+                {
+                    errorString = string.Format("名为{0}的map下属的子元素错误：{1}", key, errorString);
+                    return;
+                }
+                MapStringParamRequiredInfo paramRequiredInfo = new MapStringParamRequiredInfo();
+                paramRequiredInfo.ParamName = key;
+                paramRequiredInfo.ParamRequired = ParamRequired.None;
+                paramRequiredInfo.ArrayParamRequiredInfo = childRequiredInfo;
+
+                requiredInfo.ParamRequiredInfo.Add(key, paramRequiredInfo);
+            }
+            else
+            {
+                errorString = string.Format("mapString定义中要求key名（{0}）对应{1}类型的数据，而输入的检查规则却以array型进行设置，请不要对非array型使用[]声明", key, paramInfo.DataType);
+                return;
+            }
+        }
         else
         {
             errorString = string.Format("map子元素中的key名（{0}）对应的参数要求非法，输入值为\"{1}\"，请用1或0分别设置该参数为必须含有或不允许含有", key, keyToken.DefineString);
@@ -940,6 +1051,101 @@ public class MapStringCheckRuleParser
             errorString = string.Format("map下的子元素{0}之后未声明用英文逗号分隔下一个子元素，也没有声明map的结束，输入值为{1}", key, nextToken.DefineString);
             return;
         }
+    }
+
+    private MapStringParamRequiredInfo _GetArrayElement(MapStringParamInfo paramInfo, out string errorString)
+    {
+        // 解析value值
+        if (_tokenQueue.Count == 0)
+        {
+            errorString = string.Format("定义不完整，array层级{0}子元素未声明参数要求，请用1声明为必须存在或用0声明为不允许存在", paramInfo.ArrayDepth);
+            return null;
+        }
+        MapStringParamRequiredInfo paramRequiredInfo = null;
+        MapStringToken valueToken = _tokenQueue.Dequeue();
+        if (valueToken.TokenType == MapStringTokenType.Number)
+        {
+            if ("1".Equals(valueToken.DefineString))
+            {
+                paramRequiredInfo = new MapStringParamRequiredInfo();
+                paramRequiredInfo.ParamName = paramInfo.ParamName;
+                paramRequiredInfo.ParamRequired = ParamRequired.MustHave;
+            }
+            else if ("0".Equals(valueToken.DefineString))
+            {
+                paramRequiredInfo = new MapStringParamRequiredInfo();
+                paramRequiredInfo.ParamName = paramInfo.ParamName;
+                paramRequiredInfo.ParamRequired = ParamRequired.NotAllowed;
+            }
+            else
+            {
+                errorString = string.Format("array层级{0}子元素对应的参数要求非法，输入值为\"{1}\"，请用1或0分别设置该参数为必须含有或不允许含有", paramInfo.ArrayDepth, valueToken.DefineString);
+                return null;
+            }
+        }
+        else if (valueToken.TokenType == MapStringTokenType.StartMap)
+        {
+            if (paramInfo.DataType == DataType.MapString)
+            {
+                MapStringRequiredInfo childRequiredInfo = new MapStringRequiredInfo();
+                _GetMapElement(childRequiredInfo, paramInfo.MapStringInfo, out errorString);
+                if (errorString != null)
+                {
+                    errorString = string.Format("array层级{0}子元素错误：{1}", paramInfo.ArrayDepth, errorString);
+                    return null;
+                }
+                paramRequiredInfo = new MapStringParamRequiredInfo();
+                paramRequiredInfo.ParamName = paramInfo.ParamName;
+                paramRequiredInfo.ParamRequired = ParamRequired.None;
+                paramRequiredInfo.MapStringRequiredInfo = childRequiredInfo;
+            }
+            else
+            {
+                errorString = string.Format("array层级{0}子元素要求对应{1}类型的数据，而输入的检查规则却以mapString型进行设置，请不要对非mapString型使用括号声明", paramInfo.ArrayDepth, paramInfo.DataType);
+                return null;
+            }
+        }
+        else if (valueToken.TokenType == MapStringTokenType.StartArray)
+        {
+            if (paramInfo.DataType == DataType.Array)
+            {
+                MapStringParamRequiredInfo childRequiredInfo = _GetArrayElement(paramInfo.ArrayParamInfo, out errorString);
+                if (errorString != null)
+                {
+                    errorString = string.Format("array层级{0}子元素错误：{1}", paramInfo.ArrayDepth, errorString);
+                    return null;
+                }
+                paramRequiredInfo = new MapStringParamRequiredInfo();
+                paramRequiredInfo.ParamName = paramInfo.ParamName;
+                paramRequiredInfo.ParamRequired = ParamRequired.None;
+                paramRequiredInfo.ArrayParamRequiredInfo = childRequiredInfo;
+            }
+            else
+            {
+                errorString = string.Format("array层级{0}子元素要求对应{1}类型的数据，而输入的检查规则却以array型进行设置，请不要对非array型使用[]声明", paramInfo.ArrayDepth, paramInfo.DataType);
+                return null;
+            }
+        }
+        else
+        {
+            errorString = string.Format("array层级{0}子元素对应的参数要求非法，输入值为\"{1}\"，请用1或0分别设置该参数为必须含有或不允许含有", paramInfo.ArrayDepth, valueToken.DefineString);
+            return null;
+        }
+
+        // 解析后面的token
+        if (_tokenQueue.Count == 0)
+        {
+            errorString = string.Format("定义不完整，array层级{0}子元素之后未声明用英文逗号分隔下一个子元素，也没有声明array的结束", paramInfo.ArrayDepth);
+            return null;
+        }
+        MapStringToken nextToken = _tokenQueue.Dequeue();
+        if (nextToken.TokenType == MapStringTokenType.EndArray)
+        {
+            errorString = null;
+            return null;
+        }
+        errorString = string.Format("array层级{0}子元素之后未声明array的结束，输入值为{1}", paramInfo.ArrayDepth, nextToken.DefineString);
+        return null;
     }
 }
 
@@ -1014,4 +1220,6 @@ public class MapStringParamRequiredInfo
     public ParamRequired ParamRequired { get; set; }
 
     public MapStringRequiredInfo MapStringRequiredInfo { get; set; }
+
+    public MapStringParamRequiredInfo ArrayParamRequiredInfo { get; set; }
 }
