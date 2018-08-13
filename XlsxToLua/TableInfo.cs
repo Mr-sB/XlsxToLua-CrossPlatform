@@ -153,12 +153,22 @@ public class MapStringInfo
 /// </summary>
 public class MapStringParamInfo
 {
-    // 参数名
+    // 参数名 (Host array param name if it is an array element)
     public string ParamName { get; set; }
     // 参数的数据类型
     public DataType DataType { get; set; }
     // 如果此参数是mapString型，存储下属参数信息
     public MapStringInfo MapStringInfo { get; set; }
+    // If this parameter is an embedded array
+    public MapStringParamInfo ArrayParamInfo { get; set; }
+    // If is array element
+    public bool IsArrayElement { 
+        get
+        {
+            return ArrayDepth > 0;
+        }
+    }
+    public int ArrayDepth { get; set; }
 }
 
 /// <summary>

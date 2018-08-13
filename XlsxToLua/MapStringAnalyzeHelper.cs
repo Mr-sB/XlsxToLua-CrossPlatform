@@ -75,6 +75,7 @@ public class MapStringAnalyzeHelper
     {
         // 检查括号是否匹配
         int leftBracketCount = 0;
+        int leftSquareBracketCount = 0;
         for (int i = 0; i < defineString.Length; ++i)
         {
             char c = defineString[i];
@@ -82,16 +83,30 @@ public class MapStringAnalyzeHelper
                 ++leftBracketCount;
             else if (c == ')')
                 --leftBracketCount;
+            else if (c == '[')
+                ++leftSquareBracketCount;
+            else if (c == ']')
+                --leftSquareBracketCount;
 
             if (leftBracketCount < 0)
             {
                 errorString = string.Format("格式定义字符串中括号不匹配，第{0}个字符处的\")\"没有前面与之对应的\"(\"", i + 1);
                 return null;
             }
+            if (leftSquareBracketCount < 0)
+            {
+                errorString = string.Format("格式定义字符串中[]不匹配，第{0}个字符处的\"]\"没有前面与之对应的\"[\"", i + 1);
+                return null;
+            }
         }
         if (leftBracketCount > 0)
         {
             errorString = string.Format("格式定义字符串中括号不匹配，有{0}个\"(\"没有与之对应的\")\"", leftBracketCount);
+            return null;
+        }
+        if (leftSquareBracketCount > 0)
+        {
+            errorString = string.Format("格式定义字符串中[]不匹配，有{0}个\"[\"没有与之对应的\"]\"", leftSquareBracketCount);
             return null;
         }
 
@@ -131,6 +146,16 @@ public class MapStringAnalyzeHelper
             else if (c == ')')
             {
                 tokenList.Add(new MapStringToken(MapStringTokenType.EndMap, ")"));
+                ++nextCharIndex;
+            }
+            else if (c == '[')
+            {
+                tokenList.Add(new MapStringToken(MapStringTokenType.StartArray, "["));
+                ++nextCharIndex;
+            }
+            else if (c == ']')
+            {
+                tokenList.Add(new MapStringToken(MapStringTokenType.EndArray, "]"));
                 ++nextCharIndex;
             }
             else if (char.IsLetterOrDigit(c) || c == '_')
@@ -173,6 +198,7 @@ public class MapStringAnalyzeHelper
     {
         // 检查括号、引号是否匹配
         int leftBracketCount = 0;
+        int leftSquareBracketCount = 0;
         bool hasLeftQuotationMark = false;
         for (int i = 0; i < dataString.Length; ++i)
         {
@@ -183,10 +209,19 @@ public class MapStringAnalyzeHelper
                 --leftBracketCount;
             else if (c == '"' && i > 0 && dataString[i - 1] != '\\')
                 hasLeftQuotationMark = !hasLeftQuotationMark;
+            else if (c == '[')
+                ++leftSquareBracketCount;
+            else if (c == ']')
+                --leftSquareBracketCount;
 
             if (leftBracketCount < 0)
             {
                 errorString = string.Format("数据字符串中括号不匹配，第{0}个字符处的\")\"没有前面与之对应的\"(\"", i + 1);
+                return null;
+            }
+            if (leftSquareBracketCount < 0)
+            {
+                errorString = string.Format("数据字符串中[]不匹配，第{0}个字符处的\"]\"没有前面与之对应的\"[\"", i + 1);
                 return null;
             }
         }
@@ -198,6 +233,11 @@ public class MapStringAnalyzeHelper
         if (hasLeftQuotationMark == true)
         {
             errorString = "数据字符串中引号不匹配";
+            return null;
+        }
+        if (leftSquareBracketCount > 0)
+        {
+            errorString = string.Format("数据字符串中[]不匹配，有{0}个\"[\"没有与之对应的\"]\"", leftSquareBracketCount);
             return null;
         }
 
@@ -226,6 +266,16 @@ public class MapStringAnalyzeHelper
             else if (c == ')')
             {
                 tokenList.Add(new MapStringToken(MapStringTokenType.EndMap, ")"));
+                ++nextCharIndex;
+            }
+            else if (c == '[')
+            {
+                tokenList.Add(new MapStringToken(MapStringTokenType.StartArray, "["));
+                ++nextCharIndex;
+            }
+            else if (c == ']')
+            {
+                tokenList.Add(new MapStringToken(MapStringTokenType.EndArray, "]"));
                 ++nextCharIndex;
             }
             else if (c == '"')
@@ -427,6 +477,19 @@ public class MapStringDefineParser
             }
             mapStringInfo.ParamInfo.Add(key, paramInfo);
         }
+        else if (valueToken.TokenType == MapStringTokenType.StartArray)
+        {
+            MapStringParamInfo paramInfo = new MapStringParamInfo();
+            paramInfo.ParamName = key;
+            paramInfo.DataType = DataType.Array;
+            paramInfo.ArrayParamInfo = _GetArrayElement(key, 1, out errorString);
+            if (errorString != null)
+            {
+                errorString = string.Format("名为{0}的mapString array下属的子元素错误：{1}", key, errorString);
+                return;
+            }
+            mapStringInfo.ParamInfo.Add(key, paramInfo);
+        }
         else
         {
             errorString = string.Format("与变量名（{0}）对应的数据类型声明非法，输入值为{1}", key, valueToken.DefineString);
@@ -441,7 +504,9 @@ public class MapStringDefineParser
         }
         MapStringToken nextToken = _tokenQueue.Dequeue();
         if (nextToken.TokenType == MapStringTokenType.EndMap)
+        {
             return;
+        }
         else if (nextToken.TokenType == MapStringTokenType.Comma)
         {
             if (_tokenQueue.Count == 0)
@@ -461,6 +526,92 @@ public class MapStringDefineParser
             errorString = string.Format("map下的子元素{0}之后未声明用英文逗号分隔下一个子元素，也没有声明map的结束，输入值为{1}", key, nextToken.DefineString);
             return;
         }
+    }
+
+    private MapStringParamInfo _GetArrayElement(string arrayKey, int arrayDepth, out string errorString)
+    {
+        // 解析key
+        if (_tokenQueue.Count == 0)
+        {
+            errorString = "mapString Array define is uncompleted";
+            return null;
+        }
+
+        MapStringParamInfo paramInfo = null;
+        MapStringToken valueToken = _tokenQueue.Dequeue();
+        DataType valueDataType = DataType.Invalid;
+        if (valueToken.TokenType == MapStringTokenType.String)
+        {
+            string dataTypeString = valueToken.DefineString.Trim();
+            if ("int".Equals(dataTypeString, StringComparison.CurrentCultureIgnoreCase))
+                valueDataType = DataType.Int;
+            else if ("long".Equals(dataTypeString, StringComparison.CurrentCultureIgnoreCase))
+                valueDataType = DataType.Long;
+            else if ("float".Equals(dataTypeString, StringComparison.CurrentCultureIgnoreCase))
+                valueDataType = DataType.Float;
+            else if ("string".Equals(dataTypeString, StringComparison.CurrentCultureIgnoreCase))
+                valueDataType = DataType.String;
+            else if ("lang".Equals(dataTypeString, StringComparison.CurrentCultureIgnoreCase))
+                valueDataType = DataType.Lang;
+            else if ("bool".Equals(dataTypeString, StringComparison.CurrentCultureIgnoreCase))
+                valueDataType = DataType.Bool;
+            else
+            {
+                errorString = string.Format("mapString array层级{0}子元素对应的数据类型（{1}）非法，只支持int、long、float、string、lang、bool这几种最基础类型", arrayDepth, dataTypeString);
+                return null;
+            }
+            paramInfo = new MapStringParamInfo();
+            paramInfo.ParamName = arrayKey;
+            paramInfo.DataType = valueDataType;
+            paramInfo.ArrayDepth = arrayDepth;
+        }
+        else if (valueToken.TokenType == MapStringTokenType.StartMap)
+        {
+            paramInfo = new MapStringParamInfo();
+            paramInfo.ParamName = arrayKey;
+            paramInfo.DataType = DataType.MapString;
+            paramInfo.MapStringInfo = new MapStringInfo();
+            paramInfo.ArrayDepth = arrayDepth;
+            _GetMapElement(paramInfo.MapStringInfo, out errorString);
+            if (errorString != null)
+            {
+                errorString = string.Format("mapString array层级{0}的map子元素错误：{1}", arrayDepth, errorString);
+                return null;
+            }
+        }
+        else if (valueToken.TokenType == MapStringTokenType.StartArray)
+        {
+            paramInfo = new MapStringParamInfo();
+            paramInfo.ParamName = arrayKey;
+            paramInfo.DataType = DataType.Array;
+            paramInfo.ArrayParamInfo = _GetArrayElement(arrayKey, arrayDepth + 1, out errorString);
+            paramInfo.ArrayDepth = arrayDepth;
+            if (errorString != null)
+            {
+                errorString = string.Format("mapString array层级{0}的array子元素错误：{1}", arrayDepth, errorString);
+                return null;
+            }
+        }
+        else
+        {
+            errorString = string.Format("mapString array层级{0}子元素的数据类型声明非法，输入值为{1}", arrayDepth, valueToken.DefineString);
+            return null;
+        }
+
+        // 解析后面的token
+        if (_tokenQueue.Count == 0)
+        {
+            errorString = string.Format("mapString array层级{0}定义不完整，array下的子元素之后未声明array的结束", arrayDepth);
+            return null;
+        }
+        MapStringToken nextToken = _tokenQueue.Dequeue();
+        if (nextToken.TokenType == MapStringTokenType.EndArray)
+        {
+            errorString = null;
+            return paramInfo;
+        }
+        errorString = string.Format("mapString array层级{0}定义不完整，array下的子元素之后未声明array的结束，输入值为{1}", arrayDepth, nextToken.DefineString);
+        return null;
     }
 }
 
@@ -573,6 +724,11 @@ public class MapStringDataParser
                 errorString = string.Format("mapString定义中要求key名（{0}）对应mapString类型的数据，而输入的数据值为\"{1}\"，请按格式要求在英文括号内声明mapString类型的数据", key, valueToken.DefineString);
                 return;
             }
+            else if (paramInfo.DataType == DataType.Array)
+            {
+                errorString = string.Format("mapString定义中要求key名（{0}）对应array类型的数据，而输入的数据值为\"{1}\"，请按格式要求在[]内声明array类型的数据", key, valueToken.DefineString);
+                return;
+            }
             else
             {
                 errorString = string.Format("mapString定义中要求key名（{0}）对应{1}类型的数据，而该类型数据不应该用英文引号包裹，只有string和lang型需要", key, paramInfo.DataType);
@@ -601,6 +757,11 @@ public class MapStringDataParser
             else if (paramInfo.DataType == DataType.MapString)
             {
                 errorString = string.Format("mapString定义中要求key名（{0}）对应mapString类型的数据，而输入的数据值为\"{1}\"，请按格式要求在英文括号内声明mapString类型的数据", key, valueToken.DefineString);
+                return;
+            }
+            else if (paramInfo.DataType == DataType.Array)
+            {
+                errorString = string.Format("mapString定义中要求key名（{0}）对应array类型的数据，而输入的数据值为\"{1}\"，请按格式要求在[]内声明array类型的数据", key, valueToken.DefineString);
                 return;
             }
             else
@@ -658,6 +819,11 @@ public class MapStringDataParser
                 errorString = string.Format("mapString定义中要求key名（{0}）对应mapString类型的数据，而输入的数据值为\"{1}\"，请按格式要求在英文括号内声明mapString类型的数据", key, valueToken.DefineString);
                 return;
             }
+            else if (paramInfo.DataType == DataType.Array)
+            {
+                errorString = string.Format("mapString定义中要求key名（{0}）对应array类型的数据，而输入的数据值为\"{1}\"，请按格式要求在[]内声明array类型的数据", key, valueToken.DefineString);
+                return;
+            }
             else
             {
                 errorString = string.Format("mapString定义中要求key名（{0}）对应{1}类型的数据，而该类型数据必须用英文引号包裹", key, paramInfo.DataType);
@@ -680,6 +846,26 @@ public class MapStringDataParser
             else
             {
                 errorString = string.Format("mapString定义中要求key名（{0}）对应{1}类型的数据，而输入数据为mapString型", key, paramInfo.DataType);
+                return;
+            }
+        }
+        else if (valueToken.TokenType == MapStringTokenType.StartArray)
+        {
+            if (paramInfo.DataType == DataType.Array)
+            {
+                JsonData childJsonData = new JsonData();
+                childJsonData.SetJsonType(JsonType.Array);
+                _GetArrayElement(childJsonData, formatDefine.ParamInfo[key].ArrayParamInfo, out errorString);
+                if (errorString != null)
+                {
+                    errorString = string.Format("名为{0}的array下属的子元素错误：{1}", key, errorString);
+                    return;
+                }
+                jsonData[key] = childJsonData;
+            }
+            else
+            {
+                errorString = string.Format("mapString定义中要求key名（{0}）对应{1}类型的数据，而输入数据为array型", key, paramInfo.DataType);
                 return;
             }
         }
@@ -721,6 +907,223 @@ public class MapStringDataParser
             return;
         }
     }
+
+    private void _GetArrayElement(JsonData jsonData, MapStringParamInfo paramInfo, out string errorString)
+    {
+        errorString = null;
+        // 解析value值
+        if (_tokenQueue.Count == 0)
+        {
+            errorString = string.Format("array层级{0}数据不完整", paramInfo.ArrayDepth);
+            return;
+        }
+        MapStringToken valueToken = _tokenQueue.Dequeue();
+
+        if (valueToken.TokenType == MapStringTokenType.StringWithQuotationMark)
+        {
+            if (paramInfo.DataType == DataType.String)
+            {
+                // 适应LitJson类库的实现，对换行和引号进行处理
+                jsonData.Add(valueToken.DefineString.Replace("\\n", "\n").Replace("\\\"", "\""));
+            }
+            else if (paramInfo.DataType == DataType.Lang)
+            {
+                if (AppValues.LangData.ContainsKey(valueToken.DefineString))
+                    jsonData.Add(AppValues.LangData[valueToken.DefineString]);
+                else
+                {
+                    errorString = string.Format("array层级{0}下的index{1}子元素要求对应的lang型数据的key（{2}）在lang文件中找不到对应的value", paramInfo.ArrayDepth, jsonData.Count - 1,  valueToken.DefineString);
+                    return;
+                }
+            }
+            else if (paramInfo.DataType == DataType.MapString)
+            {
+                errorString = string.Format("array层级{0}下的index{1}子元素要求对应mapString类型的数据，而输入的数据值为\"{2}\"，请按格式要求在英文括号内声明mapString类型的数据", paramInfo.ArrayDepth, jsonData.Count - 1,  valueToken.DefineString);
+                return;
+            }
+            else if (paramInfo.DataType == DataType.Array)
+            {
+                errorString = string.Format("array层级{0}下的index{1}子元素要求对应array类型的数据，而输入的数据值为\"{2}\"，请按格式要求在[]内声明array类型的数据", paramInfo.ArrayDepth, jsonData.Count - 1,  valueToken.DefineString);
+                return;
+            }
+            else
+            {
+                errorString = string.Format("array层级{0}下的index{1}子元素要求对应{2}类型的数据，而该类型数据不应该用英文引号包裹，只有string和lang型需要", paramInfo.ArrayDepth, jsonData.Count - 1,  paramInfo.DataType);
+                return;
+            }
+        }
+        else if (valueToken.TokenType == MapStringTokenType.String)
+        {
+            if (paramInfo.DataType == DataType.Bool)
+            {
+                if ("true".Equals(valueToken.DefineString, StringComparison.CurrentCultureIgnoreCase))
+                    jsonData.Add(true);
+                else if ("false".Equals(valueToken.DefineString, StringComparison.CurrentCultureIgnoreCase))
+                    jsonData.Add(false);
+                else
+                {
+                    errorString = string.Format("array层级{0}下的index{1}子元素要求对应bool类型的数据，而输入值（{2}）非法，请用数字1、0或true、false进行数据定义", paramInfo.ArrayDepth, jsonData.Count - 1, valueToken.DefineString);
+                    return;
+                }
+            }
+            else if (paramInfo.DataType == DataType.String || paramInfo.DataType == DataType.Lang)
+            {
+                errorString = string.Format("array层级{0}下的index{1}子元素要求对应{2}类型的数据，而该类型数据必须用英文引号包裹", paramInfo.ArrayDepth, jsonData.Count - 1, paramInfo.DataType);
+                return;
+            }
+            else if (paramInfo.DataType == DataType.MapString)
+            {
+                errorString = string.Format("array层级{0}下的index{1}子元素要求对应mapString类型的数据，而输入的数据值为\"{2}\"，请按格式要求在英文括号内声明mapString类型的数据", paramInfo.ArrayDepth, jsonData.Count - 1, valueToken.DefineString);
+                return;
+            }
+            else if (paramInfo.DataType == DataType.Array)
+            {
+                errorString = string.Format("array层级{0}下的index{1}子元素要求对应array类型的数据，而输入的数据值为\"{2}\"，请按格式要求在[]内声明array类型的数据", paramInfo.ArrayDepth, jsonData.Count - 1, valueToken.DefineString);
+                return;
+            }
+            else
+            {
+                errorString = string.Format("array层级{0}下的index{1}子元素要求对应{2}类型的数据，而输入的数据值为\"{3}\"", paramInfo.ArrayDepth, jsonData.Count - 1, paramInfo.DataType, valueToken.DefineString);
+                return;
+            }
+        }
+        else if (valueToken.TokenType == MapStringTokenType.Number)
+        {
+            if (paramInfo.DataType == DataType.Int)
+            {
+                int number = 0;
+                if (int.TryParse(valueToken.DefineString, out number) == false)
+                {
+                    errorString = string.Format("array层级{0}下的index{1}子元素要求对应int类型的数据，而输入值（{2}）非法", paramInfo.ArrayDepth, jsonData.Count - 1, valueToken.DefineString);
+                    return;
+                }
+                jsonData.Add(number);
+            }
+            else if (paramInfo.DataType == DataType.Long)
+            {
+                long number = 0;
+                if (long.TryParse(valueToken.DefineString, out number) == false)
+                {
+                    errorString = string.Format("array层级{0}下的index{1}子元素要求对应long类型的数据，而输入值（{2}）非法", paramInfo.ArrayDepth, jsonData.Count - 1, valueToken.DefineString);
+                    return;
+                }
+                jsonData.Add(number);
+            }
+            else if (paramInfo.DataType == DataType.Float)
+            {
+                double number = 0;
+                if (double.TryParse(valueToken.DefineString, out number) == false)
+                {
+                    errorString = string.Format("array层级{0}下的index{1}子元素要求对应float类型的数据，而输入值（{2}）非法", paramInfo.ArrayDepth, jsonData.Count - 1, valueToken.DefineString);
+                    return;
+                }
+                jsonData.Add(number);
+            }
+            else if (paramInfo.DataType == DataType.Bool)
+            {
+                if ("1".Equals(valueToken.DefineString))
+                    jsonData.Add(true);
+                else if ("0".Equals(valueToken.DefineString))
+                    jsonData.Add(false);
+                else
+                {
+                    errorString = string.Format("array层级{0}下的index{1}子元素要求对应bool类型的数据，而输入值（{2}）非法，请用数字1、0或true、false进行数据定义", paramInfo.ArrayDepth, jsonData.Count - 1, valueToken.DefineString);
+                    return;
+                }
+            }
+            else if (paramInfo.DataType == DataType.MapString)
+            {
+                errorString = string.Format("array层级{0}下的index{1}子元素要求对应mapString类型的数据，而输入的数据值为\"{2}\"，请按格式要求在英文括号内声明mapString类型的数据", paramInfo.ArrayDepth, jsonData.Count - 1, valueToken.DefineString);
+                return;
+            }
+            else if (paramInfo.DataType == DataType.Array)
+            {
+                errorString = string.Format("array层级{0}下的index{1}子元素要求对应array类型的数据，而输入的数据值为\"{2}\"，请按格式要求在[]内声明array类型的数据", paramInfo.ArrayDepth, jsonData.Count - 1, valueToken.DefineString);
+                return;
+            }
+            else
+            {
+                errorString = string.Format("array层级{0}下的index{1}子元素要求对应{2}类型的数据，而该类型数据必须用英文引号包裹", paramInfo.ArrayDepth, jsonData.Count - 1, paramInfo.DataType);
+                return;
+            }
+        }
+        else if (valueToken.TokenType == MapStringTokenType.StartMap)
+        {
+            if (paramInfo.DataType == DataType.MapString)
+            {
+                JsonData childJsonData = new JsonData();
+                _GetMapElement(childJsonData, paramInfo.MapStringInfo, out errorString);
+                if (errorString != null)
+                {
+                    errorString = string.Format("array层级{0}下的index{1}子元素错误：{2}", paramInfo.ArrayDepth, jsonData.Count - 1, errorString);
+                    return;
+                }
+                jsonData.Add(childJsonData);
+            }
+            else
+            {
+                errorString = string.Format("array层级{0}下的index{1}子元素要求对应{2}类型的数据，而输入数据为mapString型", paramInfo.ArrayDepth, jsonData.Count - 1, paramInfo.DataType);
+                return;
+            }
+        }
+        else if (valueToken.TokenType == MapStringTokenType.StartArray)
+        {
+            if (paramInfo.DataType == DataType.Array)
+            {
+                JsonData childJsonData = new JsonData();
+                childJsonData.SetJsonType(JsonType.Array);
+                _GetArrayElement(childJsonData, paramInfo.ArrayParamInfo, out errorString);
+                if (errorString != null)
+                {
+                    errorString = string.Format("array层级{0}下的index{1}子元素错误：{2}", paramInfo.ArrayDepth, jsonData.Count - 1, errorString);
+                    return;
+                }
+                jsonData.Add(childJsonData);
+            }
+            else
+            {
+                errorString = string.Format("array层级{0}下的index{1}子元素要求对应{2}类型的数据，而输入数据为array型", paramInfo.ArrayDepth, jsonData.Count - 1, paramInfo.DataType);
+                return;
+            }
+        }
+        else
+        {
+            errorString = string.Format("array层级{0}下的index{1}子元素对应的数据值声明非法，输入值为{2}", paramInfo.ArrayDepth, jsonData.Count - 1, valueToken.DefineString);
+            return;
+        }
+
+        // 解析后面的token
+        if (_tokenQueue.Count == 0)
+        {
+            errorString = string.Format("mapString数据不完整，array层级{0}下的index{1}子元素之后未声明用英文逗号分隔下一个子元素，也没有声明array的结束", paramInfo.ArrayDepth, jsonData.Count - 1);
+            return;
+        }
+        MapStringToken nextToken = _tokenQueue.Dequeue();
+        if (nextToken.TokenType == MapStringTokenType.EndArray)
+        {
+            errorString = null;
+            return;
+        }
+        else if (nextToken.TokenType == MapStringTokenType.Comma)
+        {
+            if (_tokenQueue.Count == 0)
+            {
+                errorString = string.Format("mapString数据不完整，array层级{0}下的index{1}子元素之后的英文逗号后未声明下一个元素", paramInfo.ArrayDepth, jsonData.Count - 1);
+                return;
+            }
+            _GetArrayElement(jsonData, paramInfo, out errorString);
+            if (errorString != null)
+            {
+                errorString = string.Format("array层级{0}下的index{1}子元素后面的元素声明错误：{1}", paramInfo.ArrayDepth, jsonData.Count - 1);
+                return;
+            }
+        }
+        else
+        {
+            errorString = string.Format("array层级{0}下的index{1}子元素之后未声明用英文逗号分隔下一个子元素，也没有声明array的结束，输入值为{2}", paramInfo.ArrayDepth, jsonData.Count - 1, nextToken.DefineString);
+            return;
+        }
+    }
 }
 
 /// <summary>
@@ -735,6 +1138,8 @@ public enum MapStringTokenType
     Number,
     Comma,
     EqualSign,
+    StartArray,
+    EndArray,
 }
 
 /// <summary>
