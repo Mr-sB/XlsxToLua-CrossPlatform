@@ -1,485 +1,504 @@
-﻿using LitJson;
+﻿using XlsxToLua.Json;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-public partial class TableExportToJsonHelper
+namespace XlsxToLua
 {
-    // 用于缩进json的字符串
-    private static string _JSON_INDENTATION_STRING = "\t";
-
-    public static bool ExportTableToJson(TableInfo tableInfo, out string errorString)
+    public partial class TableExportToJsonHelper
     {
-        StringBuilder content = new StringBuilder();
+        // 用于缩进json的字符串
+        private static string _JSON_INDENTATION_STRING = "\t";
 
-        // Check compacted one colume
-        bool compactedOneColumnTable = tableInfo.TableConfig != null && tableInfo.TableConfig.ContainsKey(AppValues.CONFIG_COMPACTED_ONE_COLUMN_TABLE) && tableInfo.TableConfig[AppValues.CONFIG_COMPACTED_ONE_COLUMN_TABLE].Count > 0 && "true".Equals(tableInfo.TableConfig[AppValues.CONFIG_COMPACTED_ONE_COLUMN_TABLE][0], StringComparison.CurrentCultureIgnoreCase);
-
-        string notUsed;
-
-        // 若生成为各行数据对应的json object包含在一个json array的形式
-        if (AppValues.ExportJsonIsExportJsonArrayFormat == true)
+        public static bool ExportTableToJson(TableInfo tableInfo, out string errorString)
         {
-            // 生成json字符串开头，每行数据为一个json object，作为整张表json array的元素
-            content.Append("[");
+            StringBuilder content = new StringBuilder();
 
-            // 逐行读取表格内容生成json
-            List<FieldInfo> allField = tableInfo.GetAllClientFieldInfo();
-            int dataCount = tableInfo.GetKeyColumnFieldInfo().Data.Count;
-            int fieldCount = allField.Count;
-            for (int row = 0; row < dataCount; ++row)
+            // Check compacted one colume
+            bool compactedOneColumnTable = tableInfo.TableConfig != null &&
+                                           tableInfo.TableConfig.ContainsKey(AppValues.CONFIG_COMPACTED_ONE_COLUMN_TABLE) &&
+                                           tableInfo.TableConfig[AppValues.CONFIG_COMPACTED_ONE_COLUMN_TABLE].Count > 0 &&
+                                           "true".Equals(tableInfo.TableConfig[AppValues.CONFIG_COMPACTED_ONE_COLUMN_TABLE][0],
+                                               StringComparison.CurrentCultureIgnoreCase);
+
+            string notUsed;
+
+            // 若生成为各行数据对应的json object包含在一个json array的形式
+            if (AppValues.ExportJsonIsExportJsonArrayFormat == true)
             {
-                // 生成一行数据json object的开头
-                content.Append("{");
+                // 生成json字符串开头，每行数据为一个json object，作为整张表json array的元素
+                content.Append("[");
 
-                for (int column = 0; column < fieldCount; ++column)
+                // 逐行读取表格内容生成json
+                List<FieldInfo> allField = tableInfo.GetAllClientFieldInfo();
+                int dataCount = tableInfo.GetKeyColumnFieldInfo().Data.Count;
+                int fieldCount = allField.Count;
+                for (int row = 0; row < dataCount; ++row)
                 {
-                    string oneFieldString = _GetOneField(allField[column], row, out errorString, out notUsed);
-                    if (errorString != null)
+                    // 生成一行数据json object的开头
+                    content.Append("{");
+
+                    for (int column = 0; column < fieldCount; ++column)
                     {
-                        errorString = string.Format("额外导出表格{0}为json文件失败，", tableInfo.TableName) + errorString;
-                        return false;
-                    }
-                    else
-                        content.Append(oneFieldString);
-                }
-
-                // 去掉本行最后一个字段后多余的英文逗号，json语法不像lua那样最后一个字段后的逗号可有可无
-                content.Remove(content.Length - 1, 1);
-                // 生成一行数据json object的结尾
-                content.Append("}");
-                // 每行的json object后加英文逗号
-                content.Append(",");
-            }
-
-            // 去掉最后一行后多余的英文逗号，此处要特殊处理当表格中没有任何数据行时的情况
-            if (content.Length > 1)
-                content.Remove(content.Length - 1, 1);
-            // 生成json字符串结尾
-            content.Append("]");
-        }
-        else
-        {
-            // 生成json字符串开头，每行数据以表格主键列为key，各字段信息组成的json object为value，作为整张表json object的元素
-            content.Append("{");
-
-            // 逐行读取表格内容生成json
-            List<FieldInfo> allField = tableInfo.GetAllClientFieldInfo();
-            FieldInfo keyColumnInfo = tableInfo.GetKeyColumnFieldInfo();
-            int dataCount = keyColumnInfo.Data.Count;
-            int fieldCount = allField.Count;
-            for (int row = 0; row < dataCount; ++row)
-            {
-                // 将主键列的值作为key
-                string keyString = null;
-                if (keyColumnInfo.DataType == DataType.String)
-                {
-                    keyString = _GetStringValue(keyColumnInfo, row);
-                    content.Append(keyString);
-                }
-                else if (keyColumnInfo.DataType == DataType.Int || keyColumnInfo.DataType == DataType.Long)
-                {
-                    keyString = _GetNumberValue(keyColumnInfo, row);
-                    content.Append("\"").Append(keyString).Append("\"");
-                }
-                else
-                {
-                    errorString = string.Format("ExportTableToJson函数中未定义{0}类型的主键数值导出至json文件的形式", keyColumnInfo.DataType);
-                    Utils.LogErrorAndExit(errorString);
-                    return false;
-                }
-
-                // Check if compact one column is set
-                if (compactedOneColumnTable == true) {
-                    if (allField.Count > 1)
-                    {
-                        if (allField.Count > 2)
-                        {
-                            Utils.LogWarning(string.Format("警告：compactedOneColumnTable is set and only the first value column will be exported! " +
-                                                           "{0} column(s) will be ignored.", allField.Count - 2));
-                        }
-                        string value;
-                        _GetOneField(allField[1], row, out errorString, out value);
+                        string oneFieldString = _GetOneField(allField[column], row, out errorString, out notUsed);
                         if (errorString != null)
                         {
-                            errorString = string.Format("导出表格{0}失败，", tableInfo.TableName) + errorString;
+                            errorString = string.Format("额外导出表格{0}为json文件失败，", tableInfo.TableName) + errorString;
                             return false;
                         }
-                        content.Append(":");
-                        content.Append(value);
+                        else
+                            content.Append(oneFieldString);
+                    }
+
+                    // 去掉本行最后一个字段后多余的英文逗号，json语法不像lua那样最后一个字段后的逗号可有可无
+                    content.Remove(content.Length - 1, 1);
+                    // 生成一行数据json object的结尾
+                    content.Append("}");
+                    // 每行的json object后加英文逗号
+                    content.Append(",");
+                }
+
+                // 去掉最后一行后多余的英文逗号，此处要特殊处理当表格中没有任何数据行时的情况
+                if (content.Length > 1)
+                    content.Remove(content.Length - 1, 1);
+                // 生成json字符串结尾
+                content.Append("]");
+            }
+            else
+            {
+                // 生成json字符串开头，每行数据以表格主键列为key，各字段信息组成的json object为value，作为整张表json object的元素
+                content.Append("{");
+
+                // 逐行读取表格内容生成json
+                List<FieldInfo> allField = tableInfo.GetAllClientFieldInfo();
+                FieldInfo keyColumnInfo = tableInfo.GetKeyColumnFieldInfo();
+                int dataCount = keyColumnInfo.Data.Count;
+                int fieldCount = allField.Count;
+                for (int row = 0; row < dataCount; ++row)
+                {
+                    // 将主键列的值作为key
+                    string keyString = null;
+                    if (keyColumnInfo.DataType == DataType.String)
+                    {
+                        keyString = _GetStringValue(keyColumnInfo, row);
+                        content.Append(keyString);
+                    }
+                    else if (keyColumnInfo.DataType == DataType.Int || keyColumnInfo.DataType == DataType.Long)
+                    {
+                        keyString = _GetNumberValue(keyColumnInfo, row);
+                        content.Append("\"").Append(keyString).Append("\"");
                     }
                     else
                     {
-                        content.Append(":null");
-                    }
-                    content.Append(",");
-                    continue;
-                }
-
-                // 生成一行数据json object的开头
-                content.Append(":{");
-
-                int startColumn = (AppValues.ExportJsonIsExportJsonMapIncludeKeyColumnValue == true ? 0 : 1);
-                for (int column = startColumn; column < fieldCount; ++column)
-                {
-                    string oneFieldString = _GetOneField(allField[column], row, out errorString, out notUsed);
-                    if (errorString != null)
-                    {
-                        errorString = string.Format("额外导出表格{0}为json文件失败，", tableInfo.TableName) + errorString;
+                        errorString = string.Format("ExportTableToJson函数中未定义{0}类型的主键数值导出至json文件的形式", keyColumnInfo.DataType);
+                        Utils.LogErrorAndExit(errorString);
                         return false;
                     }
-                    else
-                        content.Append(oneFieldString);
+
+                    // Check if compact one column is set
+                    if (compactedOneColumnTable == true)
+                    {
+                        if (allField.Count > 1)
+                        {
+                            if (allField.Count > 2)
+                            {
+                                Utils.LogWarning(string.Format(
+                                    "警告：compactedOneColumnTable is set and only the first value column will be exported! " +
+                                    "{0} column(s) will be ignored.", allField.Count - 2));
+                            }
+
+                            string value;
+                            _GetOneField(allField[1], row, out errorString, out value);
+                            if (errorString != null)
+                            {
+                                errorString = string.Format("导出表格{0}失败，", tableInfo.TableName) + errorString;
+                                return false;
+                            }
+
+                            content.Append(":");
+                            content.Append(value);
+                        }
+                        else
+                        {
+                            content.Append(":null");
+                        }
+
+                        content.Append(",");
+                        continue;
+                    }
+
+                    // 生成一行数据json object的开头
+                    content.Append(":{");
+
+                    int startColumn = (AppValues.ExportJsonIsExportJsonMapIncludeKeyColumnValue == true ? 0 : 1);
+                    for (int column = startColumn; column < fieldCount; ++column)
+                    {
+                        string oneFieldString = _GetOneField(allField[column], row, out errorString, out notUsed);
+                        if (errorString != null)
+                        {
+                            errorString = string.Format("额外导出表格{0}为json文件失败，", tableInfo.TableName) + errorString;
+                            return false;
+                        }
+                        else
+                            content.Append(oneFieldString);
+                    }
+
+                    // 去掉本行最后一个字段后多余的英文逗号，json语法不像lua那样最后一个字段后的逗号可有可无
+                    content.Remove(content.Length - 1, 1);
+                    // 生成一行数据json object的结尾
+                    content.Append("}");
+                    // 每行的json object后加英文逗号
+                    content.Append(",");
                 }
 
-                // 去掉本行最后一个字段后多余的英文逗号，json语法不像lua那样最后一个字段后的逗号可有可无
-                content.Remove(content.Length - 1, 1);
-                // 生成一行数据json object的结尾
+                // 去掉最后一行后多余的英文逗号，此处要特殊处理当表格中没有任何数据行时的情况
+                if (content.Length > 1)
+                    content.Remove(content.Length - 1, 1);
+                // 生成json字符串结尾
                 content.Append("}");
-                // 每行的json object后加英文逗号
-                content.Append(",");
             }
 
-            // 去掉最后一行后多余的英文逗号，此处要特殊处理当表格中没有任何数据行时的情况
-            if (content.Length > 1)
-                content.Remove(content.Length - 1, 1);
-            // 生成json字符串结尾
-            content.Append("}");
+            string exportString = content.ToString();
+
+            // 如果声明了要整理为带缩进格式的形式
+            if (AppValues.ExportJsonIsFormat == true)
+                exportString = _FormatJson(exportString);
+
+            // 保存为json文件
+            if (Utils.SaveJsonFile(tableInfo.TableName, null, exportString) == true)
+            {
+                errorString = null;
+                return true;
+            }
+            else
+            {
+                errorString = "保存为json文件失败\n";
+                return false;
+            }
         }
 
-        string exportString = content.ToString();
-
-        // 如果声明了要整理为带缩进格式的形式
-        if (AppValues.ExportJsonIsFormat == true)
-            exportString = _FormatJson(exportString);
-
-        // 保存为json文件
-        if (Utils.SaveJsonFile(tableInfo.TableName, null, exportString) == true)
+        private static string _GetOneField(FieldInfo fieldInfo, int row, out string errorString, out string value)
         {
+            StringBuilder content = new StringBuilder();
             errorString = null;
-            return true;
-        }
-        else
-        {
-            errorString = "保存为json文件失败\n";
-            return false;
-        }
-    }
 
-    private static string _GetOneField(FieldInfo fieldInfo, int row, out string errorString, out string value)
-    {
-        StringBuilder content = new StringBuilder();
-        errorString = null;
+            // 变量名，注意array下属的子元素在json中不含key的声明
+            if (!(fieldInfo.ParentField != null && fieldInfo.ParentField.DataType == DataType.Array))
+            {
+                content.Append("\"").Append(fieldInfo.FieldName).Append("\"");
+                content.Append(":");
+            }
 
-        // 变量名，注意array下属的子元素在json中不含key的声明
-        if (!(fieldInfo.ParentField != null && fieldInfo.ParentField.DataType == DataType.Array))
-        {
-            content.Append("\"").Append(fieldInfo.FieldName).Append("\"");
-            content.Append(":");
-        }
-
-        // 对应数据值
-        //string value = null;
-        value = null;
-        switch (fieldInfo.DataType)
-        {
-            case DataType.Int:
-            case DataType.Long:
-            case DataType.Float:
+            // 对应数据值
+            //string value = null;
+            value = null;
+            switch (fieldInfo.DataType)
+            {
+                case DataType.Int:
+                case DataType.Long:
+                case DataType.Float:
                 {
                     value = _GetNumberValue(fieldInfo, row);
                     break;
                 }
-            case DataType.String:
+                case DataType.String:
                 {
                     value = _GetStringValue(fieldInfo, row);
                     break;
                 }
-            case DataType.Bool:
+                case DataType.Bool:
                 {
                     value = _GetBoolValue(fieldInfo, row);
                     break;
                 }
-            case DataType.Lang:
+                case DataType.Lang:
                 {
                     value = _GetLangValue(fieldInfo, row);
                     break;
                 }
-            case DataType.Date:
+                case DataType.Date:
                 {
                     value = _GetDateValue(fieldInfo, row);
                     break;
                 }
-            case DataType.Time:
+                case DataType.Time:
                 {
                     value = _GetTimeValue(fieldInfo, row);
                     break;
                 }
-            case DataType.Json:
+                case DataType.Json:
                 {
                     value = _GetJsonValue(fieldInfo, row);
                     break;
                 }
-            case DataType.TableString:
+                case DataType.TableString:
                 {
                     value = _GetTableStringValue(fieldInfo, row, out errorString);
                     break;
                 }
-            case DataType.MapString:
+                case DataType.MapString:
                 {
                     value = _GetMapStringValue(fieldInfo, row);
                     break;
                 }
-            case DataType.Dict:
+                case DataType.Dict:
                 {
                     value = _GetDictValue(fieldInfo, row, out errorString);
                     break;
                 }
-            case DataType.Array:
+                case DataType.Array:
                 {
                     value = _GetArrayValue(fieldInfo, row, out errorString);
                     break;
                 }
-            default:
+                default:
                 {
                     errorString = string.Format("_GetOneField函数中未定义{0}类型数据导出至json文件的形式", fieldInfo.DataType);
                     Utils.LogErrorAndExit(errorString);
                     return null;
                 }
+            }
+
+            if (errorString != null)
+            {
+                errorString = string.Format("第{0}行第{1}列的数据存在错误无法导出，", row + AppValues.DATA_FIELD_DATA_START_INDEX + 1,
+                    Utils.GetExcelColumnName(fieldInfo.ColumnSeq + 1)) + errorString;
+                return null;
+            }
+
+            content.Append(value);
+            // 一个字段结尾加逗号
+            content.Append(",");
+
+            return content.ToString();
         }
 
-        if (errorString != null)
+        private static string _GetNumberValue(FieldInfo fieldInfo, int row)
         {
-            errorString = string.Format("第{0}行第{1}列的数据存在错误无法导出，", row + AppValues.DATA_FIELD_DATA_START_INDEX + 1, Utils.GetExcelColumnName(fieldInfo.ColumnSeq + 1)) + errorString;
-            return null;
+            if (fieldInfo.Data[row] == null)
+                return "null";
+            else
+                return fieldInfo.Data[row].ToString();
         }
 
-        content.Append(value);
-        // 一个字段结尾加逗号
-        content.Append(",");
-
-        return content.ToString();
-    }
-
-    private static string _GetNumberValue(FieldInfo fieldInfo, int row)
-    {
-        if (fieldInfo.Data[row] == null)
-            return "null";
-        else
-            return fieldInfo.Data[row].ToString();
-    }
-
-    private static string _GetStringValue(FieldInfo fieldInfo, int row)
-    {
-        StringBuilder content = new StringBuilder();
-
-        content.Append("\"");
-        content.Append(fieldInfo.Data[row].ToString().Replace("\n", "\\n").Replace("\"", "\\\""));
-        content.Append("\"");
-
-        return content.ToString();
-    }
-
-    private static string _GetBoolValue(FieldInfo fieldInfo, int row)
-    {
-        if ((bool)fieldInfo.Data[row] == true)
-            return "true";
-        else
-            return "false";
-    }
-
-    private static string _GetLangValue(FieldInfo fieldInfo, int row)
-    {
-        StringBuilder content = new StringBuilder();
-
-        if (fieldInfo.Data[row] != null)
+        private static string _GetStringValue(FieldInfo fieldInfo, int row)
         {
+            StringBuilder content = new StringBuilder();
+
             content.Append("\"");
             content.Append(fieldInfo.Data[row].ToString().Replace("\n", "\\n").Replace("\"", "\\\""));
             content.Append("\"");
+
+            return content.ToString();
         }
-        else
+
+        private static string _GetBoolValue(FieldInfo fieldInfo, int row)
         {
-            if (AppValues.IsPrintEmptyStringWhenLangNotMatching == true)
-                content.Append("\"\"");
+            if ((bool) fieldInfo.Data[row] == true)
+                return "true";
             else
-                content.Append("null");
+                return "false";
         }
 
-        return content.ToString();
-    }
-
-    private static string _GetDateValue(FieldInfo fieldInfo, int row)
-    {
-        StringBuilder content = new StringBuilder();
-
-        DateFormatType dateFormatType = TableAnalyzeHelper.GetDateFormatType(fieldInfo.ExtraParam[AppValues.TABLE_INFO_EXTRA_PARAM_KEY_DATE_TO_LUA_FORMAT].ToString());
-        string exportFormatString = null;
-        // 若date型声明toLua的格式为dateTable，则按input格式进行导出
-        if (dateFormatType == DateFormatType.DataTable)
+        private static string _GetLangValue(FieldInfo fieldInfo, int row)
         {
-            dateFormatType = TableAnalyzeHelper.GetDateFormatType(fieldInfo.ExtraParam[AppValues.TABLE_INFO_EXTRA_PARAM_KEY_DATE_INPUT_FORMAT].ToString());
-            exportFormatString = fieldInfo.ExtraParam[AppValues.TABLE_INFO_EXTRA_PARAM_KEY_DATE_INPUT_FORMAT].ToString();
+            StringBuilder content = new StringBuilder();
+
+            if (fieldInfo.Data[row] != null)
+            {
+                content.Append("\"");
+                content.Append(fieldInfo.Data[row].ToString().Replace("\n", "\\n").Replace("\"", "\\\""));
+                content.Append("\"");
+            }
+            else
+            {
+                if (AppValues.IsPrintEmptyStringWhenLangNotMatching == true)
+                    content.Append("\"\"");
+                else
+                    content.Append("null");
+            }
+
+            return content.ToString();
         }
-        else
-            exportFormatString = fieldInfo.ExtraParam[AppValues.TABLE_INFO_EXTRA_PARAM_KEY_DATE_TO_LUA_FORMAT].ToString();
 
-        switch (dateFormatType)
+        private static string _GetDateValue(FieldInfo fieldInfo, int row)
         {
-            case DateFormatType.FormatString:
+            StringBuilder content = new StringBuilder();
+
+            DateFormatType dateFormatType =
+                TableAnalyzeHelper.GetDateFormatType(fieldInfo.ExtraParam[AppValues.TABLE_INFO_EXTRA_PARAM_KEY_DATE_TO_LUA_FORMAT].ToString());
+            string exportFormatString = null;
+            // 若date型声明toLua的格式为dateTable，则按input格式进行导出
+            if (dateFormatType == DateFormatType.DataTable)
+            {
+                dateFormatType =
+                    TableAnalyzeHelper.GetDateFormatType(fieldInfo.ExtraParam[AppValues.TABLE_INFO_EXTRA_PARAM_KEY_DATE_INPUT_FORMAT].ToString());
+                exportFormatString = fieldInfo.ExtraParam[AppValues.TABLE_INFO_EXTRA_PARAM_KEY_DATE_INPUT_FORMAT].ToString();
+            }
+            else
+                exportFormatString = fieldInfo.ExtraParam[AppValues.TABLE_INFO_EXTRA_PARAM_KEY_DATE_TO_LUA_FORMAT].ToString();
+
+            switch (dateFormatType)
+            {
+                case DateFormatType.FormatString:
                 {
                     if (fieldInfo.Data[row] == null)
                         content.Append("null");
                     else
-                        content.Append("\"").Append(((DateTime)(fieldInfo.Data[row])).ToString(exportFormatString)).Append("\"");
+                        content.Append("\"").Append(((DateTime) (fieldInfo.Data[row])).ToString(exportFormatString)).Append("\"");
 
                     break;
                 }
-            case DateFormatType.ReferenceDateSec:
+                case DateFormatType.ReferenceDateSec:
                 {
                     if (fieldInfo.Data[row] == null)
                         content.Append("null");
                     else
-                        content.Append(((DateTime)(fieldInfo.Data[row]) - AppValues.REFERENCE_DATE).TotalSeconds);
+                        content.Append(((DateTime) (fieldInfo.Data[row]) - AppValues.REFERENCE_DATE).TotalSeconds);
 
                     break;
                 }
-            case DateFormatType.ReferenceDateMsec:
+                case DateFormatType.ReferenceDateMsec:
                 {
                     if (fieldInfo.Data[row] == null)
                         content.Append("null");
                     else
-                        content.Append(((DateTime)(fieldInfo.Data[row]) - AppValues.REFERENCE_DATE).TotalMilliseconds);
+                        content.Append(((DateTime) (fieldInfo.Data[row]) - AppValues.REFERENCE_DATE).TotalMilliseconds);
 
                     break;
                 }
-            default:
+                default:
                 {
                     Utils.LogErrorAndExit("错误：用_GetDateValue函数导出json文件的date型的DateFormatType非法");
                     break;
                 }
+            }
+
+            return content.ToString();
         }
 
-        return content.ToString();
-    }
-
-    private static string _GetTimeValue(FieldInfo fieldInfo, int row)
-    {
-        StringBuilder content = new StringBuilder();
-
-        TimeFormatType timeFormatType = TableAnalyzeHelper.GetTimeFormatType(fieldInfo.ExtraParam[AppValues.TABLE_INFO_EXTRA_PARAM_KEY_TIME_TO_LUA_FORMAT].ToString());
-        switch (timeFormatType)
+        private static string _GetTimeValue(FieldInfo fieldInfo, int row)
         {
-            case TimeFormatType.FormatString:
+            StringBuilder content = new StringBuilder();
+
+            TimeFormatType timeFormatType =
+                TableAnalyzeHelper.GetTimeFormatType(fieldInfo.ExtraParam[AppValues.TABLE_INFO_EXTRA_PARAM_KEY_TIME_TO_LUA_FORMAT].ToString());
+            switch (timeFormatType)
+            {
+                case TimeFormatType.FormatString:
                 {
                     if (fieldInfo.Data[row] == null)
                         content.Append("null");
                     else
-                        content.Append("\"").Append(((DateTime)(fieldInfo.Data[row])).ToString(fieldInfo.ExtraParam[AppValues.TABLE_INFO_EXTRA_PARAM_KEY_TIME_TO_LUA_FORMAT].ToString())).Append("\"");
+                        content.Append("\"")
+                            .Append(((DateTime) (fieldInfo.Data[row])).ToString(fieldInfo
+                                .ExtraParam[AppValues.TABLE_INFO_EXTRA_PARAM_KEY_TIME_TO_LUA_FORMAT].ToString())).Append("\"");
 
                     break;
                 }
-            case TimeFormatType.ReferenceTimeSec:
+                case TimeFormatType.ReferenceTimeSec:
                 {
                     if (fieldInfo.Data[row] == null)
                         content.Append("null");
                     else
-                        content.Append(((DateTime)(fieldInfo.Data[row]) - AppValues.REFERENCE_DATE).TotalSeconds);
+                        content.Append(((DateTime) (fieldInfo.Data[row]) - AppValues.REFERENCE_DATE).TotalSeconds);
 
                     break;
                 }
-            default:
+                default:
                 {
                     Utils.LogErrorAndExit("错误：用_GetTimeValue函数导出json文件的time型的TimeFormatType非法");
                     break;
                 }
+            }
+
+            return content.ToString();
         }
 
-        return content.ToString();
-    }
-
-    private static string _GetJsonValue(FieldInfo fieldInfo, int row)
-    {
-        if (fieldInfo.Data[row] == null)
-            return "null";
-        else
+        private static string _GetJsonValue(FieldInfo fieldInfo, int row)
         {
-            //// 将json字符串进行格式整理，去除引号之外的所有空白字符
-            //StringBuilder stringBuilder = new StringBuilder();
-            //string inputJsonString = fieldInfo.JsonString[row];
-            //bool isInQuotationMarks = false;
-            //for (int i = 0; i < inputJsonString.Length; ++i)
-            //{
-            //    char c = inputJsonString[i];
-
-            //    if (c == '"')
-            //    {
-            //        stringBuilder.Append('"');
-            //        if (i > 0 && inputJsonString[i - 1] != '\\')
-            //            isInQuotationMarks = !isInQuotationMarks;
-            //    }
-            //    else if (c == ' ')
-            //    {
-            //        if (isInQuotationMarks == true)
-            //            stringBuilder.Append(' ');
-            //    }
-            //    else if (c != '\n' && c != '\r' && c != '\t')
-            //        stringBuilder.Append(c);
-            //}
-
-            //return stringBuilder.ToString();
-
-            return JsonMapper.ToJson(fieldInfo.Data[row]);
-        }
-    }
-
-    private static string _GetMapStringValue(FieldInfo fieldInfo, int row)
-    {
-        if (fieldInfo.Data[row] == null)
-            return "null";
-        else
-            return JsonMapper.ToJson(fieldInfo.Data[row]);
-    }
-
-    private static string _GetTableStringValue(FieldInfo fieldInfo, int row, out string errorString)
-    {
-        errorString = null;
-        if (fieldInfo.Data[row] == null)
-            return "null";
-
-        StringBuilder content = new StringBuilder();
-        string inputData = fieldInfo.Data[row].ToString();
-
-        // tableString字符串中不允许出现英文引号、斜杠
-        if (inputData.Contains("\"") || inputData.Contains("\\") || inputData.Contains("/"))
-        {
-            errorString = "tableString字符串中不允许出现英文引号、斜杠";
-            return null;
-        }
-
-        // 若tableString的key为#seq，则生成json array，否则生成json object
-        if (fieldInfo.TableStringFormatDefine.KeyDefine.KeyType == TableStringKeyType.Seq)
-            content.Append("[");
-        else
-            content.Append("{");
-
-        // 每组数据间用英文分号分隔
-        string[] allDataString = inputData.Split(new char[] { ';' }, System.StringSplitOptions.RemoveEmptyEntries);
-        // 记录每组数据中的key值（转为字符串后的），不允许出现相同的key（key：每组数据中的key值， value：第几组数据，从0开始记）
-        Dictionary<string, int> stringKeys = new Dictionary<string, int>();
-        for (int i = 0; i < allDataString.Length; ++i)
-        {
-            // 根据key的格式定义生成key
-            switch (fieldInfo.TableStringFormatDefine.KeyDefine.KeyType)
+            if (fieldInfo.Data[row] == null)
+                return "null";
+            else
             {
-                case TableStringKeyType.Seq:
-                    break;
-                case TableStringKeyType.DataInIndex:
+                //// 将json字符串进行格式整理，去除引号之外的所有空白字符
+                //StringBuilder stringBuilder = new StringBuilder();
+                //string inputJsonString = fieldInfo.JsonString[row];
+                //bool isInQuotationMarks = false;
+                //for (int i = 0; i < inputJsonString.Length; ++i)
+                //{
+                //    char c = inputJsonString[i];
+
+                //    if (c == '"')
+                //    {
+                //        stringBuilder.Append('"');
+                //        if (i > 0 && inputJsonString[i - 1] != '\\')
+                //            isInQuotationMarks = !isInQuotationMarks;
+                //    }
+                //    else if (c == ' ')
+                //    {
+                //        if (isInQuotationMarks == true)
+                //            stringBuilder.Append(' ');
+                //    }
+                //    else if (c != '\n' && c != '\r' && c != '\t')
+                //        stringBuilder.Append(c);
+                //}
+
+                //return stringBuilder.ToString();
+
+                return JsonMapper.ToJson(fieldInfo.Data[row]);
+            }
+        }
+
+        private static string _GetMapStringValue(FieldInfo fieldInfo, int row)
+        {
+            if (fieldInfo.Data[row] == null)
+                return "null";
+            else
+                return JsonMapper.ToJson(fieldInfo.Data[row]);
+        }
+
+        private static string _GetTableStringValue(FieldInfo fieldInfo, int row, out string errorString)
+        {
+            errorString = null;
+            if (fieldInfo.Data[row] == null)
+                return "null";
+
+            StringBuilder content = new StringBuilder();
+            string inputData = fieldInfo.Data[row].ToString();
+
+            // tableString字符串中不允许出现英文引号、斜杠
+            if (inputData.Contains("\"") || inputData.Contains("\\") || inputData.Contains("/"))
+            {
+                errorString = "tableString字符串中不允许出现英文引号、斜杠";
+                return null;
+            }
+
+            // 若tableString的key为#seq，则生成json array，否则生成json object
+            if (fieldInfo.TableStringFormatDefine.KeyDefine.KeyType == TableStringKeyType.Seq)
+                content.Append("[");
+            else
+                content.Append("{");
+
+            // 每组数据间用英文分号分隔
+            string[] allDataString = inputData.Split(new char[] {';'}, System.StringSplitOptions.RemoveEmptyEntries);
+            // 记录每组数据中的key值（转为字符串后的），不允许出现相同的key（key：每组数据中的key值， value：第几组数据，从0开始记）
+            Dictionary<string, int> stringKeys = new Dictionary<string, int>();
+            for (int i = 0; i < allDataString.Length; ++i)
+            {
+                // 根据key的格式定义生成key
+                switch (fieldInfo.TableStringFormatDefine.KeyDefine.KeyType)
+                {
+                    case TableStringKeyType.Seq:
+                        break;
+                    case TableStringKeyType.DataInIndex:
                     {
-                        string value = _GetDataInIndexType(fieldInfo.TableStringFormatDefine.KeyDefine.DataInIndexDefine, allDataString[i], out errorString);
+                        string value = _GetDataInIndexType(fieldInfo.TableStringFormatDefine.KeyDefine.DataInIndexDefine, allDataString[i],
+                            out errorString);
                         if (errorString == null)
                         {
-                            if (fieldInfo.TableStringFormatDefine.KeyDefine.DataInIndexDefine.DataType == DataType.Int || fieldInfo.TableStringFormatDefine.KeyDefine.DataInIndexDefine.DataType == DataType.Long)
+                            if (fieldInfo.TableStringFormatDefine.KeyDefine.DataInIndexDefine.DataType == DataType.Int ||
+                                fieldInfo.TableStringFormatDefine.KeyDefine.DataInIndexDefine.DataType == DataType.Long)
                             {
                                 // 检查key是否在该组数据中重复
                                 if (stringKeys.ContainsKey(value))
@@ -519,29 +538,31 @@ public partial class TableExportToJsonHelper
 
                         break;
                     }
-                default:
+                    default:
                     {
                         Utils.LogErrorAndExit("错误：用_GetTableStringValue函数导出未知类型的key");
                         return null;
                     }
-            }
-            if (errorString != null)
-            {
-                errorString = string.Format("tableString中第{0}组数据（{1}）的key数据存在错误，", i + 1, allDataString[i]) + errorString;
-                return null;
-            }
+                }
 
-            // 根据value的格式定义生成value
-            switch (fieldInfo.TableStringFormatDefine.ValueDefine.ValueType)
-            {
-                case TableStringValueType.True:
+                if (errorString != null)
+                {
+                    errorString = string.Format("tableString中第{0}组数据（{1}）的key数据存在错误，", i + 1, allDataString[i]) + errorString;
+                    return null;
+                }
+
+                // 根据value的格式定义生成value
+                switch (fieldInfo.TableStringFormatDefine.ValueDefine.ValueType)
+                {
+                    case TableStringValueType.True:
                     {
                         content.Append("true");
                         break;
                     }
-                case TableStringValueType.DataInIndex:
+                    case TableStringValueType.DataInIndex:
                     {
-                        string value = _GetDataInIndexType(fieldInfo.TableStringFormatDefine.ValueDefine.DataInIndexDefine, allDataString[i], out errorString);
+                        string value = _GetDataInIndexType(fieldInfo.TableStringFormatDefine.ValueDefine.DataInIndexDefine, allDataString[i],
+                            out errorString);
                         if (errorString == null)
                         {
                             DataType dataType = fieldInfo.TableStringFormatDefine.ValueDefine.DataInIndexDefine.DataType;
@@ -553,7 +574,7 @@ public partial class TableExportToJsonHelper
 
                         break;
                     }
-                case TableStringValueType.Table:
+                    case TableStringValueType.Table:
                     {
                         content.Append("{");
 
@@ -565,11 +586,13 @@ public partial class TableExportToJsonHelper
                             string value = _GetDataInIndexType(elementDefine.DataInIndexDefine, allDataString[i], out errorString);
                             if (errorString == null)
                             {
-                                if (elementDefine.DataInIndexDefine.DataType == DataType.String || elementDefine.DataInIndexDefine.DataType == DataType.Lang)
+                                if (elementDefine.DataInIndexDefine.DataType == DataType.String ||
+                                    elementDefine.DataInIndexDefine.DataType == DataType.Lang)
                                     content.AppendFormat("\"{0}\"", value);
                                 else
                                     content.Append(value);
                             }
+
                             content.Append(",");
                         }
 
@@ -579,71 +602,74 @@ public partial class TableExportToJsonHelper
 
                         break;
                     }
-                default:
+                    default:
                     {
                         Utils.LogErrorAndExit("错误：用_GetTableStringValue函数导出未知类型的value");
                         return null;
                     }
+                }
+
+                if (errorString != null)
+                {
+                    errorString = string.Format("tableString中第{0}组数据（{1}）的value数据存在错误，", i + 1, allDataString[i]) + errorString;
+                    return null;
+                }
+
+                // 每组数据生成完毕后加逗号
+                content.Append(",");
             }
-            if (errorString != null)
+
+            // 去掉最后一组后多余的英文逗号
+            content.Remove(content.Length - 1, 1);
+            if (fieldInfo.TableStringFormatDefine.KeyDefine.KeyType == TableStringKeyType.Seq)
+                content.Append("]");
+            else
+                content.Append("}");
+
+            return content.ToString();
+        }
+
+        /// <summary>
+        /// 将形如#1(int)的数据定义解析为要输出的字符串
+        /// </summary>
+        private static string _GetDataInIndexType(DataInIndexDefine define, string oneDataString, out string errorString)
+        {
+            // 一组数据中的子元素用英文逗号分隔
+            string[] allElementString = oneDataString.Trim().Split(new char[] {','}, System.StringSplitOptions.RemoveEmptyEntries);
+            // 检查是否存在指定序号的数据
+            if (allElementString.Length < define.DataIndex)
             {
-                errorString = string.Format("tableString中第{0}组数据（{1}）的value数据存在错误，", i + 1, allDataString[i]) + errorString;
+                errorString = string.Format("解析#{0}({1})类型的数据错误，输入的数据中只有{2}个子元素", define.DataIndex, define.DataType.ToString(),
+                    allElementString.Length);
                 return null;
             }
 
-            // 每组数据生成完毕后加逗号
-            content.Append(",");
+            // 检查是否为指定类型的合法数据
+            string inputString = allElementString[define.DataIndex - 1];
+            if (define.DataType != DataType.String)
+                inputString = inputString.Trim();
+
+            string value = _GetDataStringInTableString(inputString, define.DataType, out errorString);
+            if (errorString != null)
+            {
+                errorString = string.Format("解析#{0}({1})类型的数据错误，", define.DataIndex, define.DataType.ToString()) + errorString;
+                return null;
+            }
+            else
+                return value;
         }
 
-        // 去掉最后一组后多余的英文逗号
-        content.Remove(content.Length - 1, 1);
-        if (fieldInfo.TableStringFormatDefine.KeyDefine.KeyType == TableStringKeyType.Seq)
-            content.Append("]");
-        else
-            content.Append("}");
-
-        return content.ToString();
-    }
-
-    /// <summary>
-    /// 将形如#1(int)的数据定义解析为要输出的字符串
-    /// </summary>
-    private static string _GetDataInIndexType(DataInIndexDefine define, string oneDataString, out string errorString)
-    {
-        // 一组数据中的子元素用英文逗号分隔
-        string[] allElementString = oneDataString.Trim().Split(new char[] { ',' }, System.StringSplitOptions.RemoveEmptyEntries);
-        // 检查是否存在指定序号的数据
-        if (allElementString.Length < define.DataIndex)
+        /// <summary>
+        /// 将tableString类型数据字符串中的某个所填数据转为需要输出的字符串
+        /// </summary>
+        private static string _GetDataStringInTableString(string inputData, DataType dataType, out string errorString)
         {
-            errorString = string.Format("解析#{0}({1})类型的数据错误，输入的数据中只有{2}个子元素", define.DataIndex, define.DataType.ToString(), allElementString.Length);
-            return null;
-        }
-        // 检查是否为指定类型的合法数据
-        string inputString = allElementString[define.DataIndex - 1];
-        if (define.DataType != DataType.String)
-            inputString = inputString.Trim();
+            string result = null;
+            errorString = null;
 
-        string value = _GetDataStringInTableString(inputString, define.DataType, out errorString);
-        if (errorString != null)
-        {
-            errorString = string.Format("解析#{0}({1})类型的数据错误，", define.DataIndex, define.DataType.ToString()) + errorString;
-            return null;
-        }
-        else
-            return value;
-    }
-
-    /// <summary>
-    /// 将tableString类型数据字符串中的某个所填数据转为需要输出的字符串
-    /// </summary>
-    private static string _GetDataStringInTableString(string inputData, DataType dataType, out string errorString)
-    {
-        string result = null;
-        errorString = null;
-
-        switch (dataType)
-        {
-            case DataType.Bool:
+            switch (dataType)
+            {
+                case DataType.Bool:
                 {
                     if ("1".Equals(inputData) || "true".Equals(inputData, StringComparison.CurrentCultureIgnoreCase))
                         result = "true";
@@ -654,8 +680,8 @@ public partial class TableExportToJsonHelper
 
                     break;
                 }
-            case DataType.Int:
-            case DataType.Long:
+                case DataType.Int:
+                case DataType.Long:
                 {
                     long longValue;
                     bool isValid = long.TryParse(inputData, out longValue);
@@ -666,7 +692,7 @@ public partial class TableExportToJsonHelper
 
                     break;
                 }
-            case DataType.Float:
+                case DataType.Float:
                 {
                     float floatValue;
                     bool isValid = float.TryParse(inputData, out floatValue);
@@ -677,18 +703,20 @@ public partial class TableExportToJsonHelper
 
                     break;
                 }
-            case DataType.String:
+                case DataType.String:
                 {
                     result = inputData;
                     break;
                 }
-            case DataType.Lang:
+                case DataType.Lang:
                 {
                     if (AppValues.LangData.ContainsKey(inputData))
                     {
                         string langValue = AppValues.LangData[inputData];
-                        if (langValue.Contains("\"") || langValue.Contains("\\") || langValue.Contains("/") || langValue.Contains(",") || langValue.Contains(";"))
-                            errorString = string.Format("tableString中的lang型数据中不允许出现英文引号、斜杠、逗号、分号，你输入的key（{0}）对应在lang文件中的值为\"{1}\"", inputData, langValue);
+                        if (langValue.Contains("\"") || langValue.Contains("\\") || langValue.Contains("/") || langValue.Contains(",") ||
+                            langValue.Contains(";"))
+                            errorString = string.Format("tableString中的lang型数据中不允许出现英文引号、斜杠、逗号、分号，你输入的key（{0}）对应在lang文件中的值为\"{1}\"", inputData,
+                                langValue);
                         else
                             result = langValue;
                     }
@@ -697,151 +725,153 @@ public partial class TableExportToJsonHelper
 
                     break;
                 }
-            default:
+                default:
                 {
                     Utils.LogErrorAndExit(string.Format("错误：用_GetDataInTableString函数解析了tableString中不支持的数据类型{0}", dataType));
                     break;
                 }
-        }
-
-        return result;
-    }
-
-    private static string _GetDictValue(FieldInfo fieldInfo, int row, out string errorString)
-    {
-        StringBuilder content = new StringBuilder();
-
-        // 如果该dict数据用-1标为无效，则赋值为null
-        if ((bool)fieldInfo.Data[row] == false)
-            content.Append("null");
-        else
-        {
-            // dict生成json object
-            content.Append("{");
-
-            string notUsed;
-
-            // 逐个对子元素进行生成
-            foreach (FieldInfo childField in fieldInfo.ChildField)
-            {
-                string oneFieldString = _GetOneField(childField, row, out errorString, out notUsed);
-                if (errorString != null)
-                    return null;
-                else
-                    content.Append(oneFieldString);
             }
 
-            // 去掉最后一个子元素末尾多余的英文逗号
-            content.Remove(content.Length - 1, 1);
-
-            content.Append("}");
+            return result;
         }
 
-        errorString = null;
-        return content.ToString();
-    }
-
-    private static string _GetArrayValue(FieldInfo fieldInfo, int row, out string errorString)
-    {
-        StringBuilder content = new StringBuilder();
-
-        // 如果该array数据用-1标为无效，则赋值为null
-        if ((bool)fieldInfo.Data[row] == false)
-            content.Append("null");
-        else
+        private static string _GetDictValue(FieldInfo fieldInfo, int row, out string errorString)
         {
-            // array生成json array
-            content.Append("[");
+            StringBuilder content = new StringBuilder();
 
-            string notUsed;
-
-            // 逐个对子元素进行生成
-            bool hasValidChild = false;
-            foreach (FieldInfo childField in fieldInfo.ChildField)
+            // 如果该dict数据用-1标为无效，则赋值为null
+            if ((bool) fieldInfo.Data[row] == false)
+                content.Append("null");
+            else
             {
-                string oneFieldString = _GetOneField(childField, row, out errorString, out notUsed);
-                if (errorString != null)
-                    return null;
+                // dict生成json object
+                content.Append("{");
 
-                // json array中不允许null元素
-                if (!"null,".Equals(oneFieldString))
+                string notUsed;
+
+                // 逐个对子元素进行生成
+                foreach (FieldInfo childField in fieldInfo.ChildField)
                 {
-                    content.Append(oneFieldString);
-                    hasValidChild = true;
+                    string oneFieldString = _GetOneField(childField, row, out errorString, out notUsed);
+                    if (errorString != null)
+                        return null;
+                    else
+                        content.Append(oneFieldString);
                 }
-            }
 
-            // 去掉最后一个子元素末尾多余的英文逗号
-            if (hasValidChild == true)
+                // 去掉最后一个子元素末尾多余的英文逗号
                 content.Remove(content.Length - 1, 1);
 
-            content.Append("]");
+                content.Append("}");
+            }
+
+            errorString = null;
+            return content.ToString();
         }
 
-        errorString = null;
-        return content.ToString();
-    }
-
-    /// <summary>
-    /// 将紧凑型的json字符串整理为带缩进和换行的形式，需注意string型值中允许含有括号和\"
-    /// </summary>
-    private static string _FormatJson(string json)
-    {
-        StringBuilder stringBuilder = new StringBuilder();
-        int level = 0;
-        bool isInQuotationMarks = false;
-        for (int i = 0; i < json.Length; ++i)
+        private static string _GetArrayValue(FieldInfo fieldInfo, int row, out string errorString)
         {
-            char c = json[i];
+            StringBuilder content = new StringBuilder();
 
-            if (c == '[' || c == '{')
-            {
-                stringBuilder.Append(c);
-                if (isInQuotationMarks == false)
-                {
-                    stringBuilder.AppendLine();
-                    ++level;
-                    stringBuilder.Append(_GetJsonIndentation(level));
-                }
-            }
-            else if (c == ']' || c == '}')
-            {
-                if (isInQuotationMarks == false)
-                {
-                    stringBuilder.AppendLine();
-                    --level;
-                    stringBuilder.Append(_GetJsonIndentation(level));
-                }
-                stringBuilder.Append(c);
-            }
-            else if (c == ',')
-            {
-                stringBuilder.Append(c);
-                if (isInQuotationMarks == false)
-                {
-                    stringBuilder.AppendLine();
-                    stringBuilder.Append(_GetJsonIndentation(level));
-                }
-            }
-            else if (c == '"')
-            {
-                stringBuilder.Append('"');
-                if (i > 0 && json[i - 1] != '\\')
-                    isInQuotationMarks = !isInQuotationMarks;
-            }
+            // 如果该array数据用-1标为无效，则赋值为null
+            if ((bool) fieldInfo.Data[row] == false)
+                content.Append("null");
             else
-                stringBuilder.Append(c);
+            {
+                // array生成json array
+                content.Append("[");
+
+                string notUsed;
+
+                // 逐个对子元素进行生成
+                bool hasValidChild = false;
+                foreach (FieldInfo childField in fieldInfo.ChildField)
+                {
+                    string oneFieldString = _GetOneField(childField, row, out errorString, out notUsed);
+                    if (errorString != null)
+                        return null;
+
+                    // json array中不允许null元素
+                    if (!"null,".Equals(oneFieldString))
+                    {
+                        content.Append(oneFieldString);
+                        hasValidChild = true;
+                    }
+                }
+
+                // 去掉最后一个子元素末尾多余的英文逗号
+                if (hasValidChild == true)
+                    content.Remove(content.Length - 1, 1);
+
+                content.Append("]");
+            }
+
+            errorString = null;
+            return content.ToString();
         }
 
-        return stringBuilder.ToString();
-    }
+        /// <summary>
+        /// 将紧凑型的json字符串整理为带缩进和换行的形式，需注意string型值中允许含有括号和\"
+        /// </summary>
+        private static string _FormatJson(string json)
+        {
+            StringBuilder stringBuilder = new StringBuilder();
+            int level = 0;
+            bool isInQuotationMarks = false;
+            for (int i = 0; i < json.Length; ++i)
+            {
+                char c = json[i];
 
-    private static string _GetJsonIndentation(int level)
-    {
-        StringBuilder stringBuilder = new StringBuilder();
-        for (int i = 0; i < level; ++i)
-            stringBuilder.Append(_JSON_INDENTATION_STRING);
+                if (c == '[' || c == '{')
+                {
+                    stringBuilder.Append(c);
+                    if (isInQuotationMarks == false)
+                    {
+                        stringBuilder.AppendLine();
+                        ++level;
+                        stringBuilder.Append(_GetJsonIndentation(level));
+                    }
+                }
+                else if (c == ']' || c == '}')
+                {
+                    if (isInQuotationMarks == false)
+                    {
+                        stringBuilder.AppendLine();
+                        --level;
+                        stringBuilder.Append(_GetJsonIndentation(level));
+                    }
 
-        return stringBuilder.ToString();
+                    stringBuilder.Append(c);
+                }
+                else if (c == ',')
+                {
+                    stringBuilder.Append(c);
+                    if (isInQuotationMarks == false)
+                    {
+                        stringBuilder.AppendLine();
+                        stringBuilder.Append(_GetJsonIndentation(level));
+                    }
+                }
+                else if (c == '"')
+                {
+                    stringBuilder.Append('"');
+                    if (i > 0 && json[i - 1] != '\\')
+                        isInQuotationMarks = !isInQuotationMarks;
+                }
+                else
+                    stringBuilder.Append(c);
+            }
+
+            return stringBuilder.ToString();
+        }
+
+        private static string _GetJsonIndentation(int level)
+        {
+            StringBuilder stringBuilder = new StringBuilder();
+            for (int i = 0; i < level; ++i)
+                stringBuilder.Append(_JSON_INDENTATION_STRING);
+
+            return stringBuilder.ToString();
+        }
     }
 }

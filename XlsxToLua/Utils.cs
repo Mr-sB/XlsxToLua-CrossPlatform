@@ -4,184 +4,203 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 
-public class Utils
+namespace XlsxToLua
 {
-    [DllImport("kernel32.dll")]
-    private static extern IntPtr _lopen(string lpPathName, int iReadWrite);
-    [DllImport("kernel32.dll")]
-    private static extern bool CloseHandle(IntPtr hObject);
-    private const int OF_READWRITE = 2;
-    private const int OF_SHARE_DENY_NONE = 0x40;
-    private static readonly IntPtr HFILE_ERROR = new IntPtr(-1);
-
-	public static bool IsOSX {
-		get {
-			return Environment.OSVersion.Platform == PlatformID.MacOSX
-			|| (Environment.OSVersion.Platform == PlatformID.Unix && (
-			    Directory.Exists ("/Applications")
-			    && Directory.Exists ("/System")
-			    && Directory.Exists ("/Users")
-			    && Directory.Exists ("/Volumes")
-			));
-		}
-	}
-
-	public static bool IsUnix {
-		get {
-			return Environment.OSVersion.Platform == PlatformID.Unix;
-		}
-	}
-
-	public static bool IsLinux {
-		get {
-			return Environment.OSVersion.Platform == PlatformID.Unix && !IsOSX;
-		}
-	}
-
-	public static bool IsWin {
-		get {
-			return !IsOSX && !IsUnix;
-		}
-	}
-
-	public static void NotImplemntedOnOSX(string msg) {
-		if (IsOSX) {
-			throw new NotImplementedException ("Not implemented on OSX: " + msg);
-		}
-	}
-
-	private static bool IsFileLocked(string filePath)
-	{
-		if (IsOSX || IsUnix) {
-			FileInfo file = new FileInfo (filePath);
-			FileStream stream = null;
-
-			try {
-				stream = file.Open (FileMode.Open, FileAccess.Read, FileShare.None);
-			} catch (IOException) {
-				//the file is unavailable because it is:
-				//still being written to
-				//or being processed by another thread
-				//or does not exist (has already been processed)
-				return true;
-			} finally {
-				if (stream != null)
-					stream.Close ();
-			}
-
-			//file is not locked
-			return false;
-		} else {
-			IntPtr vHandle = _lopen(filePath, OF_READWRITE | OF_SHARE_DENY_NONE);
-			if (vHandle == HFILE_ERROR)
-				return true;
-			CloseHandle(vHandle);
-			return false;
-		}
-	}
-
-    /// <summary>
-    /// 获取某个文件的状态
-    /// </summary>
-    public static FileState GetFileState(string filePath)
+    public class Utils
     {
-        if (File.Exists(filePath))
-        {
-			/*
-            IntPtr vHandle = _lopen(filePath, OF_READWRITE | OF_SHARE_DENY_NONE);
-            if (vHandle == HFILE_ERROR)
-                return FileState.IsOpen;
+        public static Action<string> LogHandler = Console.WriteLine;
+        public static Action<string> LogWarningHandler = Console.WriteLine;
+        public static Action<string> LogErrorHandler = Console.WriteLine;
+        
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr _lopen(string lpPathName, int iReadWrite);
 
-            CloseHandle(vHandle);
-            return FileState.Available;
-            */
-			if (IsFileLocked(filePath))
-				return FileState.IsOpen;
-			return FileState.Available;
-        }
-        else
-            return FileState.Inexist;
-    }
+        [DllImport("kernel32.dll")]
+        private static extern bool CloseHandle(IntPtr hObject);
 
-    /// <summary>
-    /// 将Excel中的列编号转为列名称（第1列为A，第28列为AB）
-    /// </summary>
-    public static string GetExcelColumnName(int columnNumber)
-    {
-        string result = string.Empty;
-        int temp = columnNumber;
-        int quotient;
-        int remainder;
-        do
+        private const int OF_READWRITE = 2;
+        private const int OF_SHARE_DENY_NONE = 0x40;
+        private static readonly IntPtr HFILE_ERROR = new IntPtr(-1);
+
+        public static bool IsOSX
         {
-            quotient = temp / 26;
-            remainder = temp % 26;
-            if (remainder == 0)
+            get
             {
-                remainder = 26;
-                --quotient;
+                return Environment.OSVersion.Platform == PlatformID.MacOSX
+                       || (Environment.OSVersion.Platform == PlatformID.Unix && (
+                           Directory.Exists("/Applications")
+                           && Directory.Exists("/System")
+                           && Directory.Exists("/Users")
+                           && Directory.Exists("/Volumes")
+                       ));
+            }
+        }
+
+        public static bool IsUnix
+        {
+            get { return Environment.OSVersion.Platform == PlatformID.Unix; }
+        }
+
+        public static bool IsLinux
+        {
+            get { return Environment.OSVersion.Platform == PlatformID.Unix && !IsOSX; }
+        }
+
+        public static bool IsWin
+        {
+            get { return !IsOSX && !IsUnix; }
+        }
+
+        public static void NotImplemntedOnOSX(string msg)
+        {
+            if (IsOSX)
+            {
+                throw new NotImplementedException("Not implemented on OSX: " + msg);
+            }
+        }
+
+        private static bool IsFileLocked(string filePath)
+        {
+            // if (IsOSX || IsUnix)
+            // 能打开文件即可
+            if (true)
+            {
+                FileInfo file = new FileInfo(filePath);
+                FileStream stream = null;
+
+                try
+                {
+                    stream = file.Open(FileMode.Open, FileAccess.Read, FileShare.None);
+                }
+                catch (IOException)
+                {
+                    //the file is unavailable because it is:
+                    //still being written to
+                    //or being processed by another thread
+                    //or does not exist (has already been processed)
+                    return true;
+                }
+                finally
+                {
+                    if (stream != null)
+                        stream.Close();
+                }
+
+                //file is not locked
+                return false;
+            }
+            else
+            {
+                IntPtr vHandle = _lopen(filePath, OF_READWRITE | OF_SHARE_DENY_NONE);
+                if (vHandle == HFILE_ERROR)
+                    return true;
+                CloseHandle(vHandle);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 获取某个文件的状态
+        /// </summary>
+        public static FileState GetFileState(string filePath)
+        {
+            if (File.Exists(filePath))
+            {
+                /*
+                IntPtr vHandle = _lopen(filePath, OF_READWRITE | OF_SHARE_DENY_NONE);
+                if (vHandle == HFILE_ERROR)
+                    return FileState.IsOpen;
+    
+                CloseHandle(vHandle);
+                return FileState.Available;
+                */
+                if (IsFileLocked(filePath))
+                    return FileState.IsOpen;
+                return FileState.Available;
+            }
+            else
+                return FileState.Inexist;
+        }
+
+        /// <summary>
+        /// 将Excel中的列编号转为列名称（第1列为A，第28列为AB）
+        /// </summary>
+        public static string GetExcelColumnName(int columnNumber)
+        {
+            string result = string.Empty;
+            int temp = columnNumber;
+            int quotient;
+            int remainder;
+            do
+            {
+                quotient = temp / 26;
+                remainder = temp % 26;
+                if (remainder == 0)
+                {
+                    remainder = 26;
+                    --quotient;
+                }
+
+                result = (char) (remainder - 1 + 'A') + result;
+                temp = quotient;
+            } while (quotient > 0);
+
+            return result;
+        }
+
+        /// <summary>
+        /// 将List中的所有数据用指定分隔符连接为一个新字符串
+        /// </summary>
+        public static string CombineString<T>(IList<T> list, string separateString)
+        {
+            if (list == null || list.Count < 1)
+                return null;
+            else
+            {
+                StringBuilder builder = new StringBuilder();
+                for (int i = 0; i < list.Count; ++i)
+                    builder.Append(list[i]).Append(separateString);
+
+                string result = builder.ToString();
+                // 去掉最后多加的一次分隔符
+                if (separateString != null)
+                    return result.Substring(0, result.Length - separateString.Length);
+                else
+                    return result;
+            }
+        }
+
+        /// <summary>
+        /// 获取有效值声明{1,5,10}或数值范围声明[1,5]中符合要求的值集合（有效值声明支持int、float、string型，数值范围声明仅支持int型）
+        /// </summary>
+        public static List<object> GetEffectiveValue(string inputDefineString, DataType dataType, out string errorString)
+        {
+            if (string.IsNullOrEmpty(inputDefineString))
+            {
+                errorString = "未声明获取值集合的规则";
+                return null;
             }
 
-            result = (char)(remainder - 1 + 'A') + result;
-            temp = quotient;
-        }
-        while (quotient > 0);
+            List<object> result = new List<object>();
+            string defineString = inputDefineString.Trim();
 
-        return result;
-    }
+            List<FieldCheckRule> fieldCheckRules = TableCheckHelper.GetCheckRules(defineString, out errorString);
+            if (errorString != null)
+            {
+                errorString = "获取值集合规则声明错误，" + errorString;
+                return null;
+            }
 
-    /// <summary>
-    /// 将List中的所有数据用指定分隔符连接为一个新字符串
-    /// </summary>
-    public static string CombineString<T>(IList<T> list, string separateString)
-    {
-        if (list == null || list.Count < 1)
-            return null;
-        else
-        {
-            StringBuilder builder = new StringBuilder();
-            for (int i = 0; i < list.Count; ++i)
-                builder.Append(list[i]).Append(separateString);
+            if (fieldCheckRules.Count > 1)
+            {
+                errorString = "获取值集合规则声明错误，仅支持从一个有效值声明或数值范围声明中取符合要求的值集合，不支持用&&组合的规则";
+                return null;
+            }
 
-            string result = builder.ToString();
-            // 去掉最后多加的一次分隔符
-            if (separateString != null)
-                return result.Substring(0, result.Length - separateString.Length);
-            else
-                return result;
-        }
-    }
-
-    /// <summary>
-    /// 获取有效值声明{1,5,10}或数值范围声明[1,5]中符合要求的值集合（有效值声明支持int、float、string型，数值范围声明仅支持int型）
-    /// </summary>
-    public static List<object> GetEffectiveValue(string inputDefineString, DataType dataType, out string errorString)
-    {
-        if (string.IsNullOrEmpty(inputDefineString))
-        {
-            errorString = "未声明获取值集合的规则";
-            return null;
-        }
-
-        List<object> result = new List<object>();
-        string defineString = inputDefineString.Trim();
-
-        List<FieldCheckRule> fieldCheckRules = TableCheckHelper.GetCheckRules(defineString, out errorString);
-        if (errorString != null)
-        {
-            errorString = "获取值集合规则声明错误，" + errorString;
-            return null;
-        }
-        if (fieldCheckRules.Count > 1)
-        {
-            errorString = "获取值集合规则声明错误，仅支持从一个有效值声明或数值范围声明中取符合要求的值集合，不支持用&&组合的规则";
-            return null;
-        }
-
-        FieldCheckRule checkRule = fieldCheckRules[0];
-        switch (checkRule.CheckType)
-        {
-            case TableCheckType.Effective:
+            FieldCheckRule checkRule = fieldCheckRules[0];
+            switch (checkRule.CheckType)
+            {
+                case TableCheckType.Effective:
                 {
                     if (dataType == DataType.Int || dataType == DataType.Float)
                     {
@@ -191,6 +210,7 @@ public class Utils
                             errorString = "获取值集合规则所采用的值有效性声明错误：必须在首尾用一对花括号包裹整个定义内容";
                             return null;
                         }
+
                         string temp = checkRule.CheckRuleString.Substring(1, checkRule.CheckRuleString.Length - 2).Trim();
                         if (string.IsNullOrEmpty(temp))
                         {
@@ -198,7 +218,7 @@ public class Utils
                             return null;
                         }
 
-                        string[] values = temp.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                        string[] values = temp.Split(new char[] {','}, StringSplitOptions.RemoveEmptyEntries);
 
                         if (dataType == DataType.Int)
                         {
@@ -209,7 +229,8 @@ public class Utils
                                 if (int.TryParse(oneValueString, out oneValue) == true)
                                 {
                                     if (result.Contains(oneValue))
-                                        Utils.LogWarning(string.Format("警告：获取值集合规则所采用的值有效性声明（\"{0}\"）中，出现了相同的有效值\"{1}\"，本工具忽略此问题，需要你之后修正错误\n", checkRule.CheckRuleString, oneValue));
+                                        Utils.LogWarning(string.Format("警告：获取值集合规则所采用的值有效性声明（\"{0}\"）中，出现了相同的有效值\"{1}\"，本工具忽略此问题，需要你之后修正错误\n",
+                                            checkRule.CheckRuleString, oneValue));
                                     else
                                         result.Add(oneValue);
                                 }
@@ -229,7 +250,8 @@ public class Utils
                                 if (float.TryParse(oneValueString, out oneValue) == true)
                                 {
                                     if (result.Contains(oneValue))
-                                        Utils.LogWarning(string.Format("警告：获取值集合规则所采用的值有效性声明（\"{0}\"）中，出现了相同的有效值\"{1}\"，本工具忽略此问题，需要你之后修正错误\n", checkRule.CheckRuleString, oneValue));
+                                        Utils.LogWarning(string.Format("警告：获取值集合规则所采用的值有效性声明（\"{0}\"）中，出现了相同的有效值\"{1}\"，本工具忽略此问题，需要你之后修正错误\n",
+                                            checkRule.CheckRuleString, oneValue));
                                     else
                                         result.Add(oneValue);
                                 }
@@ -255,6 +277,7 @@ public class Utils
                             errorString = "获取值集合规则所采用的string型值有效性声明错误：必须用一对花括号包裹整个定义内容";
                             return null;
                         }
+
                         // 如果声明了分隔有效值的字符
                         if (rightBraceIndex != checkRule.CheckRuleString.Length - 1)
                         {
@@ -265,12 +288,15 @@ public class Utils
                                 errorString = "获取值集合规则所采用的string型值有效性声明错误：需要在最后面的括号中声明分隔各个有效值的一个字符，如果使用默认的英文逗号作为分隔符，则不必在最后面用括号声明自定义分隔字符";
                                 return null;
                             }
-                            string separatorString = checkRule.CheckRuleString.Substring(leftBracketIndex + 1, rightBracketIndex - leftBracketIndex - 1);
+
+                            string separatorString =
+                                checkRule.CheckRuleString.Substring(leftBracketIndex + 1, rightBracketIndex - leftBracketIndex - 1);
                             if (separatorString.Length > 1)
                             {
                                 errorString = string.Format("获取值集合规则所采用的string型值有效性声明错误：自定义有效值的分隔字符只能为一个字符，而你输入的为\"{0}\"", separatorString);
                                 return null;
                             }
+
                             separator = separatorString[0];
 
                             // 取得前面用花括号包裹的有效值声明
@@ -285,7 +311,7 @@ public class Utils
                             return null;
                         }
 
-                        string[] effectiveValueDefine = effectiveDefineString.Split(new char[] { separator }, StringSplitOptions.RemoveEmptyEntries);
+                        string[] effectiveValueDefine = effectiveDefineString.Split(new char[] {separator}, StringSplitOptions.RemoveEmptyEntries);
                         if (effectiveValueDefine.Length == 0)
                         {
                             errorString = "获取值集合规则所采用的string型值有效性声明错误：至少需要输入一个有效值";
@@ -295,7 +321,8 @@ public class Utils
                         foreach (string effectiveValue in effectiveValueDefine)
                         {
                             if (result.Contains(effectiveValue))
-                                Utils.LogWarning(string.Format("警告：获取值集合规则所采用的string型值有效性声明（\"{0}\"）中，出现了相同的有效值\"{1}\"，本工具忽略此问题，需要你之后修正错误\n", checkRule.CheckRuleString, effectiveValue));
+                                Utils.LogWarning(string.Format("警告：获取值集合规则所采用的string型值有效性声明（\"{0}\"）中，出现了相同的有效值\"{1}\"，本工具忽略此问题，需要你之后修正错误\n",
+                                    checkRule.CheckRuleString, effectiveValue));
                             else
                                 result.Add(effectiveValue);
                         }
@@ -308,7 +335,7 @@ public class Utils
 
                     break;
                 }
-            case TableCheckType.Range:
+                case TableCheckType.Range:
                 {
                     if (dataType == DataType.Int)
                     {
@@ -327,6 +354,7 @@ public class Utils
                             errorString = "获取值集合规则所采用的数值范围声明错误：必须用英文(或[开头，表示有效范围是否包含等于下限的情况";
                             return null;
                         }
+
                         // 规则末位必须为方括号或者圆括号
                         if (checkRule.CheckRuleString.EndsWith(")"))
                             isIncludeCeil = false;
@@ -337,15 +365,17 @@ public class Utils
                             errorString = "获取值集合规则所采用的数值范围声明错误，采用的数值范围声明错误：必须用英文)或]结尾，表示有效范围是否包含等于上限的情况";
                             return null;
                         }
+
                         // 去掉首尾的括号
                         string temp = checkRule.CheckRuleString.Substring(1, checkRule.CheckRuleString.Length - 2);
                         // 通过英文逗号分隔上下限
-                        string[] floorAndCeilString = temp.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                        string[] floorAndCeilString = temp.Split(new char[] {','}, StringSplitOptions.RemoveEmptyEntries);
                         if (floorAndCeilString.Length != 2)
                         {
                             errorString = "获取值集合规则所采用的数值范围声明错误：必须用英文逗号分隔值范围的上下限";
                             return null;
                         }
+
                         string floorString = floorAndCeilString[0].Trim();
                         string ceilString = floorAndCeilString[1].Trim();
                         // 提取上下限数值
@@ -354,17 +384,20 @@ public class Utils
                             errorString = string.Format("获取值集合规则所采用的数值范围声明错误：上限不是合法的数字，你输入的为{0}", ceilString);
                             return null;
                         }
+
                         if (int.TryParse(floorString, out floorValue) == false)
                         {
                             errorString = string.Format("获取值集合规则所采用的数值范围声明错误：下限不是合法的数字，你输入的为{0}", floorString);
                             return null;
                         }
+
                         // 判断上限是否大于下限
                         if (floorValue >= ceilValue)
                         {
                             errorString = string.Format("获取值集合规则所采用的数值范围声明错误：上限值必须大于下限值，你输入的下限为{0}，上限为{1}", floorValue, ceilString);
                             return null;
                         }
+
                         if (!isIncludeFloor)
                             ++floorValue;
                         if (!isIncludeCeil)
@@ -381,326 +414,385 @@ public class Utils
 
                     break;
                 }
-            default:
+                default:
                 {
                     errorString = "获取值集合规则声明错误，仅支持从一个有效值声明或数值范围声明中取符合要求的值集合";
                     break;
                 }
+            }
+
+            if (errorString == null)
+                return result;
+            else
+                return null;
         }
 
-        if (errorString == null)
-            return result;
-        else
-            return null;
-    }
-
-    /// <summary>
-    /// 解析在英文小括号内用|分隔的Excel文件名
-    /// </summary>
-    public static string[] GetExcelFileNames(string paramString, out string errorString)
-    {
-        int leftBracketIndex = paramString.IndexOf('(');
-        int rightBracketIndex = paramString.LastIndexOf(')');
-        if (leftBracketIndex == -1 || rightBracketIndex == -1 || leftBracketIndex > rightBracketIndex)
+        /// <summary>
+        /// 解析在英文小括号内用|分隔的Excel文件名
+        /// </summary>
+        public static string[] GetExcelFileNames(string paramString, out string errorString)
         {
-            errorString = "必须在英文小括号内声明Excel文件名";
-            return null;
-        }
-        else
-        {
-            string fileNameString = paramString.Substring(leftBracketIndex + 1, rightBracketIndex - leftBracketIndex - 1).Trim();
-            string[] fileNames = fileNameString.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
-            if (fileNames.Length < 1)
+            int leftBracketIndex = paramString.IndexOf('(');
+            int rightBracketIndex = paramString.LastIndexOf(')');
+            if (leftBracketIndex == -1 || rightBracketIndex == -1 || leftBracketIndex > rightBracketIndex)
             {
-                errorString = "必须在英文小括号内声明至少一个Excel文件名";
+                errorString = "必须在英文小括号内声明Excel文件名";
                 return null;
             }
             else
             {
-                errorString = null;
-                return fileNames;
-            }
-        }
-    }
-
-    public static void Log(string logString, ConsoleColor color = ConsoleColor.White)
-    {
-        Console.ForegroundColor = color;
-        Console.WriteLine(logString);
-        AppValues.LogContent.AppendLine(logString);
-    }
-
-    public static void LogWarning(string warningString)
-    {
-        Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine(warningString);
-        AppValues.LogContent.AppendLine(warningString);
-    }
-
-    public static void LogError(string errorString)
-    {
-        Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine(errorString);
-        AppValues.LogContent.AppendLine(errorString);
-    }
-
-    /// <summary>
-    /// 输出错误信息并在用户按任意键后退出
-    /// </summary>
-    public static void LogErrorAndExit(string errorString)
-    {
-        Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine(errorString);
-        Console.WriteLine("程序被迫退出，请修正错误后重试");
-        Console.ReadKey();
-        Environment.Exit(0);
-    }
-
-    /// <summary>
-    /// 将程序运行中检查出的所有错误保存到文本文件中，存储目录为本工具所在目录
-    /// </summary>
-    public static bool SaveErrorInfoToFile()
-    {
-        try
-        {
-            string fileName = string.Format("表格检查结果 {0}", string.Format("{0:yyyy年MM月dd日 HH时mm分ss秒}.txt", DateTime.Now));
-            string savePath = Utils.CombinePath(AppValues.PROGRAM_FOLDER_PATH, fileName);
-            StreamWriter writer = new StreamWriter(savePath, false, new UTF8Encoding(false));
-            writer.WriteLine(AppValues.LogContent.ToString().Replace("\n", System.Environment.NewLine));
-            writer.Flush();
-            writer.Close();
-
-            Log(string.Format("全部错误信息已导出文本文件，文件名为\"{0}\"，存储在本工具所在目录下", fileName));
-            return true;
-        }
-        catch
-        {
-            LogError("全部错误信息导出到文本文件失败");
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// 二分查找
-    /// </summary>
-    public static int binarySearch(List<int> dataList, int key)
-    {
-        int low = 0;
-        int high = dataList.Count - 1;
-        while (low <= high)
-        {
-            int middle = (high + low) / 2;
-            if (dataList[middle] == key)
-                return middle;
-            else if (dataList[middle] < key)
-                low = middle + 1;
-            else
-                high = middle - 1;
-        }
-
-        return -1;
-    }
-
-    public static string GetCamelCaseString(string inputString)
-    {
-        StringBuilder stringBuilder = new StringBuilder();
-        if (inputString.IndexOf('_') != -1)
-        {
-            bool isUnderlineOfLastChar = false;
-            for (int i = 0; i < inputString.Length; ++i)
-            {
-                char c = inputString[i];
-                if (c == '_')
+                string fileNameString = paramString.Substring(leftBracketIndex + 1, rightBracketIndex - leftBracketIndex - 1).Trim();
+                string[] fileNames = fileNameString.Split(new char[] {'|'}, StringSplitOptions.RemoveEmptyEntries);
+                if (fileNames.Length < 1)
                 {
-                    isUnderlineOfLastChar = true;
-                    continue;
-                }
-                if (isUnderlineOfLastChar == true)
-                {
-                    stringBuilder.Append(char.ToUpper(c));
-                    isUnderlineOfLastChar = false;
+                    errorString = "必须在英文小括号内声明至少一个Excel文件名";
+                    return null;
                 }
                 else
-                    stringBuilder.Append(char.ToLower(c));
+                {
+                    errorString = null;
+                    return fileNames;
+                }
             }
-
-            string tempClassName = stringBuilder.ToString();
-            return char.ToLower(tempClassName[0]) + tempClassName.Substring(1);
         }
-        else
-            return inputString;
-    }
 
-    /// <summary>
-    /// 获取导出某种生成文件的存储目录
-    /// </summary>
-    public static string GetExportDirectoryPath(string tableName, string exportRootPath)
-    {
-        if (AppValues.IsExportKeepDirectoryStructure == true)
+        public static void Log(string logString, ConsoleColor color = ConsoleColor.White)
         {
-            // 获取表格相对于Excel文件夹的相对路径
-            string excelFolderPath = AppValues.ExcelFolderPath.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar);
-            if (!excelFolderPath.EndsWith(Path.DirectorySeparatorChar.ToString()))
-                excelFolderPath = excelFolderPath + Path.DirectorySeparatorChar;
-
-            Uri excelFolderUri = new Uri(excelFolderPath);
-            Uri fileUri = new Uri(AppValues.ExportTableNameAndPath[tableName]);
-            Uri relativeUri = excelFolderUri.MakeRelativeUri(fileUri);
-            // 注意：Uri转为的字符串中会将中文转义为%xx，需要恢复为非转义形式
-            return Path.GetDirectoryName(CombinePath(exportRootPath, Uri.UnescapeDataString(relativeUri.ToString())));
+            Console.ForegroundColor = color;
+            LogHandler?.Invoke(logString);
+            AppValues.LogContent.AppendLine(logString);
         }
-        else
-            return exportRootPath;
-    }
 
-    /// <summary>
-    /// 将某张Excel表格转换为lua table内容保存到文件
-    /// </summary>
-    public static bool SaveLuaFile(string tableName, string fileName, string content)
-    {
-        try
+        public static void LogWarning(string warningString)
         {
-            string exportDirectoryPath = GetExportDirectoryPath(tableName, AppValues.ExportLuaFilePath);
-            if (Directory.Exists(exportDirectoryPath) == false)
-                Directory.CreateDirectory(exportDirectoryPath);
-
-            string savePath = Utils.CombinePath(exportDirectoryPath, fileName + ".lua");
-            StreamWriter writer = new StreamWriter(savePath, false, new UTF8Encoding(false));
-            writer.Write(content);
-            writer.Flush();
-            writer.Close();
-            return true;
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            LogWarningHandler?.Invoke(warningString);
+            AppValues.LogContent.AppendLine(warningString);
         }
-        catch
+
+        public static void LogError(string errorString)
         {
-            return false;
+            Console.ForegroundColor = ConsoleColor.Red;
+            LogErrorHandler?.Invoke(errorString);
+            AppValues.LogContent.AppendLine(errorString);
         }
-    }
 
-    public static bool SaveCsvFile(string tableName, List<StringBuilder> rowContentList)
-    {
-        try
+        /// <summary>
+        /// 输出错误信息并在用户按任意键后退出
+        /// </summary>
+        public static void LogErrorAndExit(string errorString)
         {
-            string exportDirectoryPath = GetExportDirectoryPath(tableName, AppValues.ExportCsvPath);
-            if (Directory.Exists(exportDirectoryPath) == false)
-                Directory.CreateDirectory(exportDirectoryPath);
-
-            string fileName = string.Concat(tableName, ".", AppValues.ExportCsvExtension);
-            string savePath = Utils.CombinePath(exportDirectoryPath, fileName);
-            StreamWriter writer = new StreamWriter(savePath, false, new UTF8Encoding(false));
-            foreach (StringBuilder stringBuilder in rowContentList)
-                writer.WriteLine(stringBuilder);
-
-            writer.Flush();
-            writer.Close();
-            return true;
+            Console.ForegroundColor = ConsoleColor.Red;
+            LogErrorHandler?.Invoke(errorString);
+            LogErrorHandler?.Invoke("程序被迫退出，请修正错误后重试");
+            // Console.ReadKey();
+            // Environment.Exit(0);
         }
-        catch
-        {
-            return false;
-        }
-    }
 
-    public static bool SaveCsClassFile(string tableName, string className, string content)
-    {
-        try
+        /// <summary>
+        /// 将程序运行中检查出的所有错误保存到文本文件中，存储目录为本工具所在目录
+        /// </summary>
+        public static bool SaveErrorInfoToFile()
         {
-            string exportDirectoryPath = GetExportDirectoryPath(tableName, AppValues.ExportCsClassPath);
-            if (Directory.Exists(exportDirectoryPath) == false)
-                Directory.CreateDirectory(exportDirectoryPath);
-
-            string fileName = string.Concat(className, ".", AppValues.EXPORT_CS_CLASS_FILE_EXTENSION);
-            string savePath = Utils.CombinePath(exportDirectoryPath, fileName);
-            StreamWriter writer = new StreamWriter(savePath, false, new UTF8Encoding(false));
-            writer.Write(content);
-            writer.Flush();
-            writer.Close();
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    public static bool SaveJavaClassFile(string tableName, string className, string content)
-    {
-        try
-        {
-            string exportDirectoryPath = GetExportDirectoryPath(tableName, AppValues.ExportJavaClassPath);
-            if (Directory.Exists(exportDirectoryPath) == false)
-                Directory.CreateDirectory(exportDirectoryPath);
-
-            string fileName = string.Concat(className, ".", AppValues.EXPORT_JAVA_CLASS_FILE_EXTENSION);
-            string savePath = Utils.CombinePath(exportDirectoryPath, fileName);
-            StreamWriter writer = new StreamWriter(savePath, false, new UTF8Encoding(false));
-            writer.Write(content);
-            writer.Flush();
-            writer.Close();
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    public static bool SaveJsonFile(string tableName, string alternativeFileName, string content)
-    {
-        try
-        {
-            string exportDirectoryPath = GetExportDirectoryPath(tableName, AppValues.ExportJsonPath);
-            if (Directory.Exists(exportDirectoryPath) == false)
-                Directory.CreateDirectory(exportDirectoryPath);
-
-            if (string.IsNullOrEmpty(alternativeFileName))
+            try
             {
-                alternativeFileName = string.Concat(tableName, ".", AppValues.ExportJsonExtension);
+                string fileName = string.Format("表格检查结果 {0}", string.Format("{0:yyyy年MM月dd日 HH时mm分ss秒}.txt", DateTime.Now));
+                string savePath = Utils.CombinePath(AppValues.PROGRAM_FOLDER_PATH, fileName);
+                StreamWriter writer = new StreamWriter(savePath, false, new UTF8Encoding(false));
+                writer.WriteLine(AppValues.LogContent.ToString().Replace("\n", System.Environment.NewLine));
+                writer.Flush();
+                writer.Close();
+
+                Log(string.Format("全部错误信息已导出文本文件，文件名为\"{0}\"，存储在本工具所在目录下", fileName));
+                return true;
             }
-            else 
+            catch
             {
-                alternativeFileName = string.Concat(alternativeFileName, ".", AppValues.ExportJsonExtension);
+                LogError("全部错误信息导出到文本文件失败");
+                return false;
             }
-            string savePath = Utils.CombinePath(exportDirectoryPath, alternativeFileName);
-            StreamWriter writer = new StreamWriter(savePath, false, new UTF8Encoding(false));
-            writer.Write(content);
-            writer.Flush();
-            writer.Close();
-            return true;
         }
-        catch
+
+        /// <summary>
+        /// 二分查找
+        /// </summary>
+        public static int binarySearch(List<int> dataList, int key)
         {
-            return false;
+            int low = 0;
+            int high = dataList.Count - 1;
+            while (low <= high)
+            {
+                int middle = (high + low) / 2;
+                if (dataList[middle] == key)
+                    return middle;
+                else if (dataList[middle] < key)
+                    low = middle + 1;
+                else
+                    high = middle - 1;
+            }
+
+            return -1;
+        }
+
+        public static string GetCamelCaseString(string inputString)
+        {
+            StringBuilder stringBuilder = new StringBuilder();
+            if (inputString.IndexOf('_') != -1)
+            {
+                bool isUnderlineOfLastChar = false;
+                for (int i = 0; i < inputString.Length; ++i)
+                {
+                    char c = inputString[i];
+                    if (c == '_')
+                    {
+                        isUnderlineOfLastChar = true;
+                        continue;
+                    }
+
+                    if (isUnderlineOfLastChar == true)
+                    {
+                        stringBuilder.Append(char.ToUpper(c));
+                        isUnderlineOfLastChar = false;
+                    }
+                    else
+                        stringBuilder.Append(char.ToLower(c));
+                }
+
+                string tempClassName = stringBuilder.ToString();
+                return char.ToLower(tempClassName[0]) + tempClassName.Substring(1);
+            }
+            else
+                return inputString;
+        }
+
+        /// <summary>
+        /// 获取导出某种生成文件的存储目录
+        /// </summary>
+        public static string GetExportDirectoryPath(string tableName, string exportRootPath)
+        {
+            if (AppValues.IsExportKeepDirectoryStructure == true)
+            {
+                // 获取表格相对于Excel文件夹的相对路径
+                string excelFolderPath = AppValues.ExcelFolderPath.Replace('\\', Path.DirectorySeparatorChar)
+                    .Replace('/', Path.DirectorySeparatorChar);
+                if (!excelFolderPath.EndsWith(Path.DirectorySeparatorChar.ToString()))
+                    excelFolderPath = excelFolderPath + Path.DirectorySeparatorChar;
+
+                Uri excelFolderUri = new Uri(excelFolderPath);
+                Uri fileUri = new Uri(AppValues.ExportTableNameAndPath[tableName]);
+                Uri relativeUri = excelFolderUri.MakeRelativeUri(fileUri);
+                // 注意：Uri转为的字符串中会将中文转义为%xx，需要恢复为非转义形式
+                return Path.GetDirectoryName(CombinePath(exportRootPath, Uri.UnescapeDataString(relativeUri.ToString())));
+            }
+            else
+                return exportRootPath;
+        }
+
+        /// <summary>
+        /// 将某张Excel表格转换为lua table内容保存到文件
+        /// </summary>
+        public static bool SaveLuaFile(string tableName, string fileName, string content)
+        {
+            try
+            {
+                string exportDirectoryPath = GetExportDirectoryPath(tableName, AppValues.ExportLuaFilePath);
+                if (Directory.Exists(exportDirectoryPath) == false)
+                    Directory.CreateDirectory(exportDirectoryPath);
+
+                string savePath = Utils.CombinePath(exportDirectoryPath, fileName + ".lua");
+                StreamWriter writer = new StreamWriter(savePath, false, new UTF8Encoding(false));
+                writer.Write(content);
+                writer.Flush();
+                writer.Close();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public static bool SaveCsvFile(string tableName, List<StringBuilder> rowContentList)
+        {
+            try
+            {
+                string exportDirectoryPath = GetExportDirectoryPath(tableName, AppValues.ExportCsvPath);
+                if (Directory.Exists(exportDirectoryPath) == false)
+                    Directory.CreateDirectory(exportDirectoryPath);
+
+                string fileName = string.Concat(tableName, ".", AppValues.ExportCsvExtension);
+                string savePath = Utils.CombinePath(exportDirectoryPath, fileName);
+                StreamWriter writer = new StreamWriter(savePath, false, new UTF8Encoding(false));
+                foreach (StringBuilder stringBuilder in rowContentList)
+                    writer.WriteLine(stringBuilder);
+
+                writer.Flush();
+                writer.Close();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public static bool SaveCsClassFile(string tableName, string className, string content)
+        {
+            try
+            {
+                string exportDirectoryPath = GetExportDirectoryPath(tableName, AppValues.ExportCsClassPath);
+                if (Directory.Exists(exportDirectoryPath) == false)
+                    Directory.CreateDirectory(exportDirectoryPath);
+
+                string fileName = string.Concat(className, ".", AppValues.EXPORT_CS_CLASS_FILE_EXTENSION);
+                string savePath = Utils.CombinePath(exportDirectoryPath, fileName);
+                StreamWriter writer = new StreamWriter(savePath, false, new UTF8Encoding(false));
+                writer.Write(content);
+                writer.Flush();
+                writer.Close();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public static bool SaveJavaClassFile(string tableName, string className, string content)
+        {
+            try
+            {
+                string exportDirectoryPath = GetExportDirectoryPath(tableName, AppValues.ExportJavaClassPath);
+                if (Directory.Exists(exportDirectoryPath) == false)
+                    Directory.CreateDirectory(exportDirectoryPath);
+
+                string fileName = string.Concat(className, ".", AppValues.EXPORT_JAVA_CLASS_FILE_EXTENSION);
+                string savePath = Utils.CombinePath(exportDirectoryPath, fileName);
+                StreamWriter writer = new StreamWriter(savePath, false, new UTF8Encoding(false));
+                writer.Write(content);
+                writer.Flush();
+                writer.Close();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public static bool SaveJsonFile(string tableName, string alternativeFileName, string content)
+        {
+            try
+            {
+                string exportDirectoryPath = GetExportDirectoryPath(tableName, AppValues.ExportJsonPath);
+                if (Directory.Exists(exportDirectoryPath) == false)
+                    Directory.CreateDirectory(exportDirectoryPath);
+
+                if (string.IsNullOrEmpty(alternativeFileName))
+                {
+                    alternativeFileName = string.Concat(tableName, ".", AppValues.ExportJsonExtension);
+                }
+                else
+                {
+                    alternativeFileName = string.Concat(alternativeFileName, ".", AppValues.ExportJsonExtension);
+                }
+
+                string savePath = Utils.CombinePath(exportDirectoryPath, alternativeFileName);
+                StreamWriter writer = new StreamWriter(savePath, false, new UTF8Encoding(false));
+                writer.Write(content);
+                writer.Flush();
+                writer.Close();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 合并两个路径字符串，与.Net类库中的Path.Combine不同，本函数不会因为path2以目录分隔符开头就认为是绝对路径，然后直接返回path2
+        /// </summary>
+        public static string CombinePath(string path1, string path2)
+        {
+            path1 = path1.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar);
+            if (!path1.EndsWith(Path.DirectorySeparatorChar.ToString()))
+                path1 = path1 + Path.DirectorySeparatorChar;
+
+            path2 = path2.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar);
+            if (path2.StartsWith(Path.DirectorySeparatorChar.ToString()))
+                path2 = path2.Substring(1, path2.Length - 1);
+
+            return Path.Combine(path1, path2);
+        }
+
+        public static List<string> GetSupportedExcelFilePaths(string excelFolder, SearchOption searchOption)
+        {
+            List<string> existExcelFilePaths = new List<string>(Directory.GetFiles(excelFolder, "*.xlsx", searchOption));
+            existExcelFilePaths.AddRange(Directory.GetFiles(excelFolder, "*.xlsm", searchOption));
+            return existExcelFilePaths;
+        }
+
+        public static void ResetAppValues()
+        {
+            AppValues.AUTO_FIELD_NAME_PREFIX = "未命名字段";
+            AppValues.ExcelFolderPath = null;
+            AppValues.ExportLuaFilePath = null;
+            AppValues.IsExportIncludeSubfolder = false;
+            AppValues.IsExportKeepDirectoryStructure = false;
+            AppValues.LangFilePath = null;
+            AppValues.ClientPath = null;
+            AppValues.IsNeedCheck = true;
+            AppValues.IsPrintEmptyStringWhenLangNotMatching = false;
+            AppValues.IsExportMySQL = false;
+            AppValues.IsNeedColumnInfo = false;
+            AppValues.IsAllowedNullNumber = false;
+            AppValues.DefaultDateInputFormat = null;
+            AppValues.DefaultDateToLuaFormat = null;
+            AppValues.DefaultDateToDatabaseFormat = null;
+            AppValues.DefaultTimeInputFormat = null;
+            AppValues.DefaultTimeToLuaFormat = null;
+            AppValues.DefaultTimeToDatabaseFormat = null;
+            AppValues.LangData = new Dictionary<string, string>();
+            AppValues.ConfigData = new Dictionary<string, string>();
+            AppValues.TableInfo = new Dictionary<string, TableInfo>();
+            AppValues.ExportTableNameAndPath = new Dictionary<string, string>();
+            AppValues.ExceptExportTableNames = new List<string>();
+            AppValues.ExportCsvTableNames = new List<string>();
+            AppValues.ExportCsvPath = null;
+            AppValues.ExportCsvExtension = "csv";
+            AppValues.ExportCsvSplitString = ",";
+            AppValues.ExportCsvIsExportColumnName = true;
+            AppValues.ExportCsvIsExportColumnDataType = true;
+            AppValues.ExportCsClassTableNames = new List<string>();
+            AppValues.ExportCsClassPath = null;
+            AppValues.ExportCsClassNamespace = null;
+            AppValues.ExportCsClassUsing = null;
+            AppValues.ExportJavaClassTableNames = new List<string>();
+            AppValues.ExportJavaClassPath = null;
+            AppValues.ExportJavaClassPackage = null;
+            AppValues.ExportJavaClassImport = null;
+            AppValues.ExportJavaClassIsUseDate = true;
+            AppValues.ExportJavaClassisGenerateConstructorWithoutFields = false;
+            AppValues.ExportJavaClassIsGenerateConstructorWithAllFields = false;
+            AppValues.ExportCsvClassClassNamePrefix = null;
+            AppValues.ExportCsvClassClassNamePostfix = null;
+            AppValues.ExportJsonTableNames = new List<string>();
+            AppValues.ExportJsonPath = null;
+            AppValues.ExportJsonExtension = "txt";
+            AppValues.ExportJsonIsFormat = false;
+            AppValues.ExportJsonIsExportJsonArrayFormat = true;
+            AppValues.ExportJsonIsExportJsonMapIncludeKeyColumnValue = true;
+            AppValues.LogContent = new StringBuilder();
         }
     }
+    
+    
 
-    /// <summary>
-    /// 合并两个路径字符串，与.Net类库中的Path.Combine不同，本函数不会因为path2以目录分隔符开头就认为是绝对路径，然后直接返回path2
-    /// </summary>
-    public static string CombinePath(string path1, string path2)
+    public enum FileState
     {
-        path1 = path1.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar);
-        if (!path1.EndsWith(Path.DirectorySeparatorChar.ToString()))
-            path1 = path1 + Path.DirectorySeparatorChar;
-
-        path2 = path2.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar);
-        if (path2.StartsWith(Path.DirectorySeparatorChar.ToString()))
-            path2 = path2.Substring(1, path2.Length - 1);
-
-        return Path.Combine(path1, path2);
+        Inexist, // 不存在
+        IsOpen, // 已被打开
+        Available, // 当前可用
     }
-
-    public static List<string> GetSupportedExcelFilePaths(string excelFolder, SearchOption searchOption)
-    {
-		List<string> existExcelFilePaths = new List<string>(Directory.GetFiles(excelFolder, "*.xlsx", searchOption));
-        existExcelFilePaths.AddRange(Directory.GetFiles(excelFolder, "*.xlsm", searchOption));
-        return existExcelFilePaths;
-	}
-}
-
-public enum FileState
-{
-    Inexist,     // 不存在
-    IsOpen,      // 已被打开
-    Available,   // 当前可用
 }
