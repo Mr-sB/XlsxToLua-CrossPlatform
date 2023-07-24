@@ -1409,9 +1409,9 @@ namespace XlsxToLua
                         TableInfo tableInfo = AppValues.TableInfo[tableName];
                         string errorString = null;
                         Utils.Log(string.Format("导出表格\"{0}\"：", tableInfo.TableName), ConsoleColor.Green);
-                        bool isNeedExportOriginalTable = true;
                         if (AppValues.ExportLuaFilePath != null)
                         {
+                            bool isNeedExportOriginalTable = true;
                             // 判断是否设置了特殊导出规则
                             if (tableInfo.TableConfig != null && tableInfo.TableConfig.ContainsKey(AppValues.CONFIG_NAME_EXPORT))
                             {
@@ -1431,24 +1431,15 @@ namespace XlsxToLua
                                 {
                                     if (!AppValues.CONFIG_PARAM_NOT_EXPORT_ORIGINAL_TABLE.Equals(param, StringComparison.CurrentCultureIgnoreCase))
                                     {
-                                        Utils.Log(string.Format("对此表格按\"{0}\"自定义规则进行导出：", param));
+                                        Utils.Log(string.Format("对此表格按\"{0}\"自定义规则导出lua文件：", param));
                                         TableExportToLuaHelper.SpecialExportTableToLua(tableInfo, param, out errorString);
                                         if (errorString != null)
                                         {
-                                            Utils.LogErrorAndExit(string.Format("导出lua失败：\n{0}\n", errorString));
+                                            Utils.LogErrorAndExit(string.Format("导出失败：\n{0}\n", errorString));
                                             return -1;
                                         }
                                         else
-                                            Utils.Log("导lua成功");
-
-                                        TableExportToJsonHelper.SpecialExportTableToJson(tableInfo, param, out errorString);
-                                        if (errorString != null)
-                                        {
-                                            Utils.LogErrorAndExit(string.Format("导出json失败：\n{0}\n", errorString));
-                                            return -1;
-                                        }
-                                        else
-                                            Utils.Log("导出json成功");
+                                            Utils.Log("成功");
                                     }
                                 }
                             }
@@ -1462,7 +1453,7 @@ namespace XlsxToLua
                                     return -1;
                                 }
                                 else
-                                    Utils.Log("按默认方式导出成功");
+                                    Utils.Log("按默认方式导出lua文件成功");
                             }
                         }
 
@@ -1506,7 +1497,7 @@ namespace XlsxToLua
                         }
 
                         // 判断是否要额外导出为json文件
-                        if (isNeedExportOriginalTable == true && AppValues.ExportJsonTableNames.Contains(tableName))
+                        if (AppValues.ExportJsonTableNames.Contains(tableName))
                         {
                             TableExportToJsonHelper.ExportTableToJson(tableInfo, out errorString);
                             if (errorString != null)
