@@ -636,18 +636,41 @@ namespace XlsxToLua
         {
             // 一组数据中的子元素用英文逗号分隔
             string[] allElementString = oneDataString.Trim().Split(new char[] {','}, System.StringSplitOptions.RemoveEmptyEntries);
+            string inputString;
             // 检查是否存在指定序号的数据
             if (allElementString.Length < define.DataIndex)
             {
-                errorString = string.Format("解析#{0}({1})类型的数据错误，输入的数据中只有{2}个子元素", define.DataIndex, define.DataType.ToString(),
-                    allElementString.Length);
-                return null;
+                //基础数据类型允许留空，使用默认值
+                switch (define.DataType)
+                {
+                    case DataType.Int:
+                        inputString = "0";
+                        break;
+                    case DataType.Long:
+                        inputString = "0";
+                        break;
+                    case DataType.Float:
+                        inputString = "0";
+                        break;
+                    case DataType.Bool:
+                        inputString = "false";
+                        break;
+                    case DataType.String:
+                        inputString = "";
+                        break;
+                    default:
+                        errorString = string.Format("解析#{0}({1})类型的数据错误，输入的数据中只有{2}个子元素", define.DataIndex, define.DataType.ToString(),
+                            allElementString.Length);
+                        return null;
+                }
             }
-
-            // 检查是否为指定类型的合法数据
-            string inputString = allElementString[define.DataIndex - 1];
-            if (define.DataType != DataType.String)
-                inputString = inputString.Trim();
+            else
+            {
+                // 检查是否为指定类型的合法数据
+                inputString = allElementString[define.DataIndex - 1];
+                if (define.DataType != DataType.String)
+                    inputString = inputString.Trim();
+            }
 
             string value = _GetDataStringInTableString(inputString, define.DataType, out errorString);
             if (errorString != null)
